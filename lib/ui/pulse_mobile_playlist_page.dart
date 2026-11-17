@@ -259,11 +259,21 @@ class _PulseMobilePlaylistPageState extends State<PulseMobilePlaylistPage> {
                 title: AnimatedOpacity(
                   opacity: _collapsed ? 1 : 0,
                   duration: const Duration(milliseconds: 150),
-                  child: Text(widget.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w800)),
+                  child: Row(children: [
+                    SizedBox.square(
+                      dimension: 32,
+                      child: _mosaic(32),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                  ]),
                 ),
                 actions: [
                   if (_collapsed)

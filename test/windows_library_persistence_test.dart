@@ -25,7 +25,8 @@ void main() {
     }
   });
 
-  test('chosen folder, favorites, and playlists survive a restart', () async {
+  test('chosen folder, favorites, and pinned playlists survive a restart',
+      () async {
     final firstRun = LibraryController(
       WindowsLibraryStore(storageDirectory: storageDirectory),
     );
@@ -36,6 +37,7 @@ void main() {
     await firstRun.createPlaylist('Favoritas');
     final playlist = firstRun.snapshot.playlists.single;
     await firstRun.addToPlaylist(playlist.id, track);
+    await firstRun.setPlaylistPinned(playlist.id, true);
     firstRun.dispose();
 
     final secondRun = LibraryController(
@@ -48,6 +50,7 @@ void main() {
     expect(secondRun.snapshot.favoriteIds, {track.id});
     expect(secondRun.snapshot.playlists.single.name, 'Favoritas');
     expect(secondRun.snapshot.playlists.single.trackIds, [track.id]);
+    expect(secondRun.snapshot.playlists.single.pinned, isTrue);
     expect(secondRun.sourceState, LibrarySourceState.available);
     secondRun.dispose();
   });

@@ -16,6 +16,7 @@ class PulseDesktopLibrarySidebar extends StatefulWidget {
     required this.onSelectRemotePlaylist,
     required this.onPlayPlaylist,
     required this.onPlayTrack,
+    required this.onTrackContextMenu,
     required this.onPlaylistContextMenu,
     required this.onOpenAlbum,
     required this.onCreatePlaylist,
@@ -23,6 +24,7 @@ class PulseDesktopLibrarySidebar extends StatefulWidget {
     required this.onFocusSearch,
     required this.playlists,
     required this.remotePlaylists,
+    required this.remotePlaylistPrefix,
     required this.tracks,
     required this.favoriteIds,
     required this.width,
@@ -37,6 +39,7 @@ class PulseDesktopLibrarySidebar extends StatefulWidget {
   final ValueChanged<String> onSelectRemotePlaylist;
   final ValueChanged<String> onPlayPlaylist;
   final ValueChanged<AudioTrack> onPlayTrack;
+  final void Function(AudioTrack track, Offset position) onTrackContextMenu;
   final void Function(String playlistId, Offset position) onPlaylistContextMenu;
   final ValueChanged<String> onOpenAlbum;
   final VoidCallback? onCreatePlaylist;
@@ -44,6 +47,7 @@ class PulseDesktopLibrarySidebar extends StatefulWidget {
   final VoidCallback onFocusSearch;
   final List<PulsePlaylist> playlists;
   final List<Map<String, dynamic>> remotePlaylists;
+  final String remotePlaylistPrefix;
   final List<AudioTrack> tracks;
   final Set<String> favoriteIds;
   final String? selectedPlaylistId;
@@ -164,7 +168,9 @@ class _PulseDesktopLibrarySidebarState
               for (final id in playlist.trackIds)
                 if (byId[id] case final track?) track,
             ],
-            icon: Icons.queue_music_rounded,
+            icon: playlist.pinned
+                ? Icons.push_pin_rounded
+                : Icons.queue_music_rounded,
             selected: widget.selected == PulseDestination.playlists &&
                 widget.selectedPlaylistId == playlist.id,
             onTap: () => widget.onSelectPlaylist(playlist.id),
@@ -185,6 +191,8 @@ class _PulseDesktopLibrarySidebarState
               selected: widget.selected == PulseDestination.playlists &&
                   widget.selectedRemotePlaylistId == id,
               onTap: () => widget.onSelectRemotePlaylist(id),
+              onSecondaryTapDown: (position) => widget.onPlaylistContextMenu(
+                  '${widget.remotePlaylistPrefix}:$id', position),
             ),
       if (filter == PulseDestination.library ||
           filter == PulseDestination.albums)
@@ -221,11 +229,22 @@ class _PulseDesktopLibrarySidebarState
             selected: false,
             onTap: () => widget.onPlayTrack(track),
             onPlay: () => widget.onPlayTrack(track),
+            onSecondaryTapDown: (position) =>
+                widget.onTrackContextMenu(track, position),
           ),
     ];
-    entries.sort((a, b) => _reverse
-        ? b.title.toLowerCase().compareTo(a.title.toLowerCase())
-        : a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    final pinnedIds = widget.playlists
+        .where((playlist) => playlist.pinned)
+        .map((playlist) => playlist.id)
+        .toSet();
+    entries.sort((a, b) {
+      final pinnedOrder = (pinnedIds.contains(b.identity) ? 1 : 0) -
+          (pinnedIds.contains(a.identity) ? 1 : 0);
+      if (pinnedOrder != 0) return pinnedOrder;
+      return _reverse
+          ? b.title.toLowerCase().compareTo(a.title.toLowerCase())
+          : a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
     final query = normalizeSearchText(_search.text.trim());
     final visible = query.isEmpty
         ? entries

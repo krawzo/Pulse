@@ -226,6 +226,7 @@ class LibraryController extends ChangeNotifier {
                   ],
                   description: playlist.description,
                   folderName: playlist.folderName,
+                  pinned: playlist.pinned,
                 )
               : playlist,
         )
@@ -245,6 +246,7 @@ class LibraryController extends ChangeNotifier {
                 trackIds: uniqueIds,
                 description: playlist.description,
                 folderName: playlist.folderName,
+                pinned: playlist.pinned,
               )
             : playlist)
         .toList(growable: false);
@@ -268,6 +270,7 @@ class LibraryController extends ChangeNotifier {
                   trackIds: playlist.trackIds,
                   description: description.trim(),
                   folderName: playlist.folderName,
+                  pinned: playlist.pinned,
                 )
               : playlist,
         )
@@ -292,9 +295,27 @@ class LibraryController extends ChangeNotifier {
                   trackIds: playlist.trackIds,
                   description: playlist.description,
                   folderName: nextFolder,
+                  pinned: playlist.pinned,
                 )
               : playlist,
         )
+        .toList(growable: false);
+    await _saveSnapshot(_snapshot.copyWith(playlists: playlists));
+  }
+
+  Future<void> setPlaylistPinned(String playlistId, bool pinned) async {
+    if (!_canMutate) return;
+    final playlists = _snapshot.playlists
+        .map((playlist) => playlist.id == playlistId
+            ? PulsePlaylist(
+                id: playlist.id,
+                name: playlist.name,
+                trackIds: playlist.trackIds,
+                description: playlist.description,
+                folderName: playlist.folderName,
+                pinned: pinned,
+              )
+            : playlist)
         .toList(growable: false);
     await _saveSnapshot(_snapshot.copyWith(playlists: playlists));
   }

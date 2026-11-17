@@ -31,6 +31,7 @@ class PulseCollectionHero extends StatefulWidget {
     this.onMobileMenuPressed,
     this.trailingActionsBuilder,
     this.colorOverride,
+    this.collapsibleHeader = false,
   });
 
   final String title;
@@ -52,6 +53,7 @@ class PulseCollectionHero extends StatefulWidget {
   final VoidCallback? onMobileMenuPressed;
   final Widget Function(bool compact)? trailingActionsBuilder;
   final Color? colorOverride;
+  final bool collapsibleHeader;
 
   @override
   State<PulseCollectionHero> createState() => _PulseCollectionHeroState();
@@ -59,11 +61,29 @@ class PulseCollectionHero extends StatefulWidget {
 
 class _PulseCollectionHeroState extends State<PulseCollectionHero> {
   Future<Color?>? _coverColor;
+  final ScrollController _headerScrollController = ScrollController();
+  bool _showCompactHeader = false;
 
   @override
   void initState() {
     super.initState();
+    _headerScrollController.addListener(_onHeaderScroll);
     _loadColor();
+  }
+
+  void _onHeaderScroll() {
+    if (!_headerScrollController.hasClients) return;
+    final show = _headerScrollController.offset >= 120;
+    if (show != _showCompactHeader && mounted) {
+      setState(() => _showCompactHeader = show);
+    }
+  }
+
+  @override
+  void dispose() {
+    _headerScrollController.removeListener(_onHeaderScroll);
+    _headerScrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -180,6 +200,7 @@ class _PulseCollectionHeroState extends State<PulseCollectionHero> {
         builder: (context, constraints) {
           final narrow = constraints.maxWidth < 600;
           final mobile = Platform.isAndroid && narrow;
+          final desktopCollapsible = !mobile && widget.collapsibleHeader;
           final toolbarOnSecondLine = widget.trailingActionsBuilder != null &&
               constraints.maxWidth < 500;
           final light = Theme.of(context).brightness == Brightness.light;
@@ -235,12 +256,14 @@ class _PulseCollectionHeroState extends State<PulseCollectionHero> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconButton(
-                        tooltip: widget.backTooltip,
-                        onPressed: widget.onBack,
-                        icon: Icon(Icons.arrow_back_rounded, color: ink),
-                      ),
-                      const SizedBox(height: 10),
+                      if (!desktopCollapsible) ...[
+                        IconButton(
+                          tooltip: widget.backTooltip,
+                          onPressed: widget.onBack,
+                          icon: Icon(Icons.arrow_back_rounded, color: ink),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       if (mobile) ...[
                         Center(
                           child: widget.artworkBuilder?.call(coverSize) ??
@@ -465,23 +488,83 @@ class _PulseCollectionHeroState extends State<PulseCollectionHero> {
               ];
               return Container(
                 decoration: BoxDecoration(gradient: pageGradient),
-                child: mobile
+                child: desktopCollapsible
                     ? NestedScrollView(
+                        controller: _headerScrollController,
                         headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                          SliverAppBar(
+                            pinned: true,
+                            toolbarHeight: 60,
+                            backgroundColor: frosted
+                                ? const Color(0xCC20262B)
+                                : Color.lerp(base, surface, .58),
+                            surfaceTintColor: Colors.transparent,
+                            scrolledUnderElevation: 0,
+                            leading: IconButton(
+                              tooltip: widget.backTooltip,
+                              onPressed: widget.onBack,
+                              icon: const Icon(Icons.arrow_back_rounded,
+                                  color: Colors.white),
+                            ),
+                            titleSpacing: 0,
+                            title: AnimatedOpacity(
+                              opacity: _showCompactHeader ? 1 : 0,
+                              duration: const Duration(milliseconds: 140),
+                              child: Row(children: [
+                                PulseTrackArtwork(
+                                  artworkTracks: widget.tracks,
+                                  title: widget.title,
+                                  creator: widget.metadata,
+                                  size: 36,
+                                  borderRadius: 4,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(widget.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w700)),
+                                ),
+                              ]),
+                            ),
+                            actions: [
+                              if (_showCompactHeader)
+                                IconButton(
+                                  tooltip: widget.playTooltip,
+                                  onPressed: widget.onPlay,
+                                  icon: const Icon(Icons.play_arrow_rounded,
+                                      color: Colors.white),
+                                ),
+                            ],
+                          ),
                           SliverToBoxAdapter(
                             child: Column(children: header),
                           ),
                         ],
                         body: widget.content ?? const SizedBox.shrink(),
                       )
-                    : Column(
-                        children: [
-                          ...header,
-                          Expanded(
-                            child: widget.content ?? const SizedBox.shrink(),
+                    : mobile
+                        ? NestedScrollView(
+                            headerSliverBuilder:
+                                (context, innerBoxIsScrolled) => [
+                              SliverToBoxAdapter(
+                                child: Column(children: header),
+                              ),
+                            ],
+                            body: widget.content ?? const SizedBox.shrink(),
+                          )
+                        : Column(
+                            children: [
+                              ...header,
+                              Expanded(
+                                child:
+                                    widget.content ?? const SizedBox.shrink(),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
               );
             },
           );

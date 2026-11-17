@@ -67,6 +67,7 @@ class PulsePlaylist {
     required this.trackIds,
     this.description,
     this.folderName,
+    this.pinned = false,
   });
 
   final String id;
@@ -74,6 +75,7 @@ class PulsePlaylist {
   final List<String> trackIds;
   final String? description;
   final String? folderName;
+  final bool pinned;
 
   PulsePlaylist withTrack(String trackId) => PulsePlaylist(
         id: id,
@@ -82,6 +84,7 @@ class PulsePlaylist {
             trackIds.contains(trackId) ? trackIds : [...trackIds, trackId],
         description: description,
         folderName: folderName,
+        pinned: pinned,
       );
 
   factory PulsePlaylist.fromJson(Map<String, Object?> json) => PulsePlaylist(
@@ -90,6 +93,7 @@ class PulsePlaylist {
         trackIds: List<String>.from(json['trackIds']! as List),
         description: json['description'] as String?,
         folderName: json['folderName'] as String?,
+        pinned: json['pinned'] == true,
       );
 
   Map<String, Object?> toJson() => {
@@ -98,5 +102,6 @@ class PulsePlaylist {
         'trackIds': trackIds,
         if (description?.trim().isNotEmpty == true) 'description': description,
         if (folderName?.trim().isNotEmpty == true) 'folderName': folderName,
+        if (pinned) 'pinned': true,
       };
 }

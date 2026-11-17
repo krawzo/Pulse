@@ -17,6 +17,7 @@ void main() {
       palette: PulsePalette.blueNavy,
       density: PulseDensity.comfortable,
       lastTrackId: 'track-1',
+      lastAccountFingerprint: 'account-alice',
       lastPositionMillis: 12345,
       lastQueueIds: ['track-1', 'track-2'],
     );

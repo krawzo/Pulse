@@ -1279,6 +1279,8 @@ class _PulseHomePageState extends State<PulseHomePage>
                                   },
                                   onPlaylistContextMenu:
                                       _showPlaylistContextMenu,
+                                  onRemotePlaylistContextMenu:
+                                      _showRemotePlaylistContextMenu,
                                   onCreatePlaylist: () {
                                     Navigator.of(context).pop();
                                     _createPlaylist();
@@ -1427,6 +1429,8 @@ class _PulseHomePageState extends State<PulseHomePage>
                                                               _openPlaylist,
                                                           onPlaylistContextMenu:
                                                               _showPlaylistContextMenu,
+                                                          onRemotePlaylistContextMenu:
+                                                              _showRemotePlaylistContextMenu,
                                                           onCreatePlaylist:
                                                               _createPlaylist,
                                                           onFocusSearch: () =>
@@ -1454,6 +1458,11 @@ class _PulseHomePageState extends State<PulseHomePage>
                                                           remotePlaylists:
                                                               widget.jellyfin
                                                                   .playlists,
+                                                          remotePlaylistPrefix:
+                                                              widget
+                                                                  .jellyfin
+                                                                  .serverKind
+                                                                  .name,
                                                           tracks:
                                                               _availablePlaylistTracks,
                                                           compact: widget
@@ -1479,6 +1488,12 @@ class _PulseHomePageState extends State<PulseHomePage>
                                                               _showPlaylistContextMenu,
                                                           onPlayPlaylist:
                                                               _playPlaylistFromSidebar,
+                                                          onTrackContextMenu: (track,
+                                                                  position) =>
+                                                              _showQueueTrackContextMenu(
+                                                                  track,
+                                                                  -1,
+                                                                  position),
                                                           onPlayTrack: (track) {
                                                             final tracks =
                                                                 _availablePlaylistTracks;
@@ -1809,6 +1824,8 @@ class _PulseHomePageState extends State<PulseHomePage>
                                                           ? PulseQueuePanel(
                                                               playback: widget
                                                                   .playback,
+                                                              onTrackContextMenu:
+                                                                  _showQueueTrackContextMenu,
                                                               onClose: () =>
                                                                   setState(() =>
                                                                       _rightPanelQueue =
@@ -2288,6 +2305,7 @@ class _PulseHomePageState extends State<PulseHomePage>
                 onConnected: () {
                   Navigator.of(dialogContext).pop(true);
                   _selectDestination(PulseDestination.library);
+                  unawaited(_restoreNavidromeQueueAfterLogin());
                 },
                 onClose: () => Navigator.of(dialogContext).pop(false),
               ),
@@ -2300,12 +2318,12 @@ class _PulseHomePageState extends State<PulseHomePage>
   Future<void> _restoreNavidromeQueueAfterLogin() async {
     if (!mounted ||
         widget.jellyfin.serverKind != MusicServerKind.navidrome ||
-        widget.playback.currentTrack != null) {
+        widget.playback.isPlaying) {
       return;
     }
     try {
       final saved = await widget.jellyfin.savedNavidromeQueue();
-      if (!mounted || saved == null || widget.playback.currentTrack != null) {
+      if (!mounted || saved == null || widget.playback.isPlaying) {
         return;
       }
       widget.playback.restoreCheckpoint(
@@ -2850,6 +2868,153 @@ class _PulseHomePageState extends State<PulseHomePage>
         ),
       ),
     );
+  }
+
+  Future<void> _showQueueTrackContextMenu(
+      AudioTrack track, int index, Offset globalPosition) async {
+    final overlay = Overlay.of(context).context.findRenderObject();
+    if (overlay is! RenderBox) return;
+    final position = overlay.globalToLocal(globalPosition);
+    RelativeRect menuPosition() => RelativeRect.fromLTRB(
+          position.dx,
+          position.dy,
+          overlay.size.width - position.dx,
+          overlay.size.height - position.dy,
+        );
+    PopupMenuItem<String> item(String value, IconData icon, String label) =>
+        PopupMenuItem<String>(
+          value: value,
+          height: 46,
+          child: Row(children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+                child:
+                    Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          ]),
+        );
+    Future<String?> choose(List<PopupMenuEntry<String>> items) =>
+        showMenu<String>(
+          context: context,
+          position: menuPosition(),
+          constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          items: items,
+        );
+
+    final favorite = _isFavorite(track);
+    final selected = await choose([
+      item('playlist', Icons.playlist_add_rounded, 'Adicionar à playlist'),
+      item(
+          'favorite',
+          favorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          favorite
+              ? 'Remover de músicas curtidas'
+              : 'Adicionar a músicas curtidas'),
+      item('add_queue', Icons.queue_music_rounded, 'Adicionar à fila'),
+      item('play_next', Icons.playlist_play_rounded, 'Tocar a seguir'),
+      if (index > widget.playback.currentIndex)
+        item('remove_queue', Icons.remove_circle_outline_rounded,
+            'Remover da fila'),
+      if (track.source == AudioSource.jellyfin)
+        item(
+            'download',
+            widget.jellyfin.isDownloaded(track)
+                ? Icons.download_done_rounded
+                : Icons.download_outlined,
+            widget.jellyfin.isDownloaded(track)
+                ? 'Remover download'
+                : 'Baixar'),
+      item('timer', Icons.timer_outlined, 'Timer'),
+      const PopupMenuDivider(height: 8),
+      if (track.artist?.trim().isNotEmpty == true)
+        item('artist', Icons.person_outline_rounded, 'Ir para o artista'),
+      if (track.album?.trim().isNotEmpty == true)
+        item('album', Icons.album_outlined, 'Ir para o álbum'),
+      item('details', Icons.info_outline_rounded, 'Ver dados da faixa'),
+      item('share', Icons.share_outlined, 'Compartilhar'),
+    ]);
+    if (!mounted || selected == null) return;
+    switch (selected) {
+      case 'playlist':
+        final playlists = _playlistChoicesForTrack(track);
+        final playlistId = await choose([
+          if (playlists.isEmpty)
+            const PopupMenuItem<String>(
+                enabled: false, child: Text('Nenhuma playlist criada')),
+          for (final playlist in playlists)
+            item(playlist.id, Icons.queue_music_rounded, playlist.name),
+        ]);
+        if (playlistId != null) {
+          _runStoreAction(() => _addTrackToPlaylist(playlistId, track));
+        }
+      case 'favorite':
+        _runStoreAction(() => track.source == AudioSource.jellyfin
+            ? widget.jellyfin.toggleFavorite(track)
+            : widget.library.toggleFavorite(track));
+      case 'add_queue':
+        widget.playback.addToQueue(track);
+        _showMessage('${track.title} foi adicionada à fila.');
+      case 'play_next':
+        widget.playback.playNext(track);
+        _showMessage('${track.title} será a próxima faixa.');
+      case 'remove_queue':
+        if (widget.playback.removeUpcomingAt(index)) {
+          _showMessage('${track.title} foi removida da fila.');
+        }
+      case 'download':
+        if (!widget.jellyfin.isDownloading(track)) _toggleDownload(track);
+      case 'timer':
+        final timer = await choose([
+          for (final minutes in [5, 10, 15, 30, 45, 60])
+            item('$minutes', Icons.schedule_rounded, '$minutes minutos'),
+          item('end_of_track', Icons.stop_circle_outlined,
+              'Quando a faixa acabar'),
+          if (widget.playback.hasSleepTimer)
+            item('cancel', Icons.timer_off_outlined, 'Cancelar timer'),
+        ]);
+        if (timer == 'end_of_track') {
+          _setSleepTimer(null);
+        } else if (timer == 'cancel') {
+          _setSleepTimer(Duration.zero);
+        } else if (int.tryParse(timer ?? '') case final minutes?) {
+          _setSleepTimer(Duration(minutes: minutes));
+        }
+      case 'artist':
+        track.source == AudioSource.jellyfin
+            ? _openRemoteArtist(track.artist!.trim())
+            : _openArtist(track.artist!.trim());
+      case 'album':
+        track.source == AudioSource.jellyfin
+            ? _openRemoteAlbum(track)
+            : _openAlbum(
+                '${track.artist?.trim() ?? ''}\u0000${track.album!.trim()}');
+      case 'details':
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Dados da faixa'),
+            content: SelectableText([
+              'Título: ${track.title}',
+              if (track.artist?.trim().isNotEmpty == true)
+                'Artista: ${track.artist}',
+              if (track.album?.trim().isNotEmpty == true)
+                'Álbum: ${track.album}',
+              if (track.genre?.trim().isNotEmpty == true)
+                'Gênero: ${track.genre}',
+            ].join('\n')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Fechar'),
+              )
+            ],
+          ),
+        );
+      case 'share':
+        await _shareTrack(track);
+    }
   }
 
   Future<void> _showMobileTimerChoices() async {
@@ -4788,6 +4953,12 @@ class _PulseHomePageState extends State<PulseHomePage>
     String playlistId,
     Offset globalPosition,
   ) async {
+    if (playlistId.startsWith('${widget.jellyfin.serverKind.name}:')) {
+      final id =
+          playlistId.substring(widget.jellyfin.serverKind.name.length + 1);
+      await _showRemotePlaylistContextMenu(id, globalPosition);
+      return;
+    }
     final playlistIndex = widget.library.snapshot.playlists
         .indexWhere((item) => item.id == playlistId);
     if (playlistIndex < 0) return;
@@ -4830,14 +5001,12 @@ class _PulseHomePageState extends State<PulseHomePage>
             label: 'Apagar',
           ),
         ),
-        const PopupMenuItem<String>(
-          enabled: false,
-          child: Tooltip(
-            message: 'Download de playlists ainda não está disponível.',
-            child: _PlaylistMenuLabel(
-              icon: Icons.download_outlined,
-              label: 'Baixar',
-            ),
+        PopupMenuItem(
+          value: 'download',
+          enabled: tracks.any((track) => track.source == AudioSource.jellyfin),
+          child: const _PlaylistMenuLabel(
+            icon: Icons.download_outlined,
+            label: 'Baixar',
           ),
         ),
         const PopupMenuDivider(),
@@ -4855,12 +5024,36 @@ class _PulseHomePageState extends State<PulseHomePage>
             label: 'Criar pasta',
           ),
         ),
+        const PopupMenuItem(
+          value: 'move_to_folder',
+          child: _PlaylistMenuLabel(
+            icon: Icons.drive_file_move_outline,
+            label: 'Mover para pasta',
+          ),
+        ),
         PopupMenuItem(
           value: 'copy_to_playlist',
           enabled: playlist.trackIds.isNotEmpty,
           child: const _PlaylistMenuLabel(
             icon: Icons.playlist_add_rounded,
             label: 'Adicionar a outra playlist',
+          ),
+        ),
+        PopupMenuItem(
+          value: 'pin',
+          child: _PlaylistMenuLabel(
+            icon: playlist.pinned
+                ? Icons.push_pin_outlined
+                : Icons.push_pin_rounded,
+            label: playlist.pinned ? 'Desafixar playlist' : 'Fixar playlist',
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'share',
+          child: _PlaylistMenuLabel(
+            icon: Icons.share_outlined,
+            label: 'Compartilhar',
           ),
         ),
       ],
@@ -4870,8 +5063,84 @@ class _PulseHomePageState extends State<PulseHomePage>
       await _createPlaylist();
     } else if (action == 'create_folder') {
       await _createPlaylistFolderFor(playlist);
+    } else if (action == 'download') {
+      await _downloadRemotePlaylist(tracks);
     } else {
       await _onPlaylistMenuAction(action, playlist, tracks);
+    }
+  }
+
+  Future<void> _showRemotePlaylistContextMenu(
+      String playlistId, Offset globalPosition) async {
+    final playlist = widget.jellyfin.playlists
+        .where((item) => item['Id']?.toString() == playlistId)
+        .firstOrNull;
+    if (playlist == null) return;
+    final overlay = Overlay.of(context).context.findRenderObject();
+    if (overlay is! RenderBox) return;
+    final position = overlay.globalToLocal(globalPosition);
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(position.dx, position.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: const [
+        PopupMenuItem(
+            value: 'add_queue',
+            child: _PlaylistMenuLabel(
+                icon: Icons.queue_music_rounded, label: 'Adicionar à fila')),
+        PopupMenuItem(
+            value: 'rename',
+            child: _PlaylistMenuLabel(
+                icon: Icons.edit_outlined, label: 'Editar os detalhes')),
+        PopupMenuItem(
+            value: 'edit_tracks',
+            child: _PlaylistMenuLabel(
+                icon: Icons.playlist_play_rounded, label: 'Editar faixas')),
+        PopupMenuItem(
+            value: 'delete',
+            child: _PlaylistMenuLabel(
+                icon: Icons.remove_circle_outline_rounded, label: 'Apagar')),
+        PopupMenuItem(
+            value: 'download',
+            child: _PlaylistMenuLabel(
+                icon: Icons.download_outlined, label: 'Baixar')),
+        PopupMenuDivider(),
+        PopupMenuItem(
+            value: 'create_playlist',
+            child: _PlaylistMenuLabel(
+                icon: Icons.playlist_add_rounded, label: 'Criar playlist')),
+        PopupMenuItem(
+            value: 'share',
+            child: _PlaylistMenuLabel(
+                icon: Icons.share_outlined, label: 'Compartilhar')),
+      ],
+    );
+    if (!mounted || action == null) return;
+    if (action == 'create_playlist') {
+      await _createPlaylist();
+      return;
+    }
+    if (action == 'rename' || action == 'edit_tracks' || action == 'delete') {
+      await _onRemotePlaylistMenuAction(action, playlist);
+      return;
+    }
+    try {
+      final tracks = await widget.jellyfin.playlistTracks(playlistId);
+      if (!mounted) return;
+      switch (action) {
+        case 'add_queue':
+          widget.playback.addTracksToQueue(tracks);
+          _showMessage('${tracks.length} faixa(s) adicionada(s) à fila.');
+        case 'download':
+          await _downloadRemotePlaylist(tracks);
+        case 'share':
+          await _shareTrackCollection(
+              playlist['Name']?.toString() ?? 'Playlist', tracks);
+      }
+    } on Object catch (error) {
+      if (mounted) _showMessage(_remotePlaylistError(error));
     }
   }
 
@@ -5014,6 +5283,8 @@ class _PulseHomePageState extends State<PulseHomePage>
         await _movePlaylistToFolder(playlist);
       case 'copy_to_playlist':
         await _addPlaylistToAnother(playlist);
+      case 'pin':
+        await widget.library.setPlaylistPinned(playlist.id, !playlist.pinned);
       case 'share':
         await _sharePlaylist(playlist, tracks);
       case 'delete':
@@ -5085,6 +5356,7 @@ class _PulseHomePageState extends State<PulseHomePage>
             );
           }
           return PulseCollectionHero(
+            collapsibleHeader: true,
             title: remotePlaylist['Name']?.toString() ?? 'Playlist',
             type: 'Playlist',
             metadata: '${widget.jellyfin.serverName} • ${tracks.length} faixas',
@@ -5185,6 +5457,7 @@ class _PulseHomePageState extends State<PulseHomePage>
               );
             }
             return PulseCollectionHero(
+              collapsibleHeader: true,
               title: playlist.name,
               type: 'Playlist do Pulse',
               metadata: [
@@ -5377,6 +5650,9 @@ class _PulseHomePageState extends State<PulseHomePage>
       final folder = playlist.folderName?.trim() ?? '';
       groups.putIfAbsent(folder, () => []).add(playlist);
     }
+    for (final group in groups.values) {
+      group.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+    }
     final folders = groups.keys.toList()
       ..sort((a, b) {
         if (a == b) return 0;
@@ -5423,12 +5699,18 @@ class _PulseHomePageState extends State<PulseHomePage>
         if (row.remote case final remote?) {
           final id = remote['Id']?.toString();
           return Column(children: [
-            ListTile(
-              leading: const Icon(Icons.queue_music_rounded),
-              title: Text(remote['Name']?.toString() ?? 'Playlist'),
-              subtitle: const Text('Playlist'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: id == null ? null : () => _openRemotePlaylist(id),
+            GestureDetector(
+              onSecondaryTapDown: id == null
+                  ? null
+                  : (details) => _showRemotePlaylistContextMenu(
+                      id, details.globalPosition),
+              child: ListTile(
+                leading: const Icon(Icons.queue_music_rounded),
+                title: Text(remote['Name']?.toString() ?? 'Playlist'),
+                subtitle: const Text('Playlist'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: id == null ? null : () => _openRemotePlaylist(id),
+              ),
             ),
             const Divider(height: 1),
           ]);

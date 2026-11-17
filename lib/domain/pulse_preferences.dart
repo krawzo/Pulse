@@ -27,6 +27,7 @@ class PulsePreferences {
     this.volumeLevel = PulseVolumeLevel.normal,
     this.monoAudio = false,
     this.lastTrackId,
+    this.lastAccountFingerprint,
     this.lastPositionMillis = 0,
     this.lastQueueIds = const [],
   });
@@ -48,6 +49,7 @@ class PulsePreferences {
   final PulseVolumeLevel volumeLevel;
   final bool monoAudio;
   final String? lastTrackId;
+  final String? lastAccountFingerprint;
   final int lastPositionMillis;
   final List<String> lastQueueIds;
 
@@ -69,6 +71,7 @@ class PulsePreferences {
           PulseVolumeLevel? volumeLevel,
           bool? monoAudio,
           String? lastTrackId,
+          String? lastAccountFingerprint,
           int? lastPositionMillis,
           List<String>? lastQueueIds,
           bool clearCheckpoint = false}) =>
@@ -90,6 +93,9 @@ class PulsePreferences {
         volumeLevel: volumeLevel ?? this.volumeLevel,
         monoAudio: monoAudio ?? this.monoAudio,
         lastTrackId: clearCheckpoint ? null : lastTrackId ?? this.lastTrackId,
+        lastAccountFingerprint: clearCheckpoint
+            ? null
+            : lastAccountFingerprint ?? this.lastAccountFingerprint,
         lastPositionMillis:
             clearCheckpoint ? 0 : lastPositionMillis ?? this.lastPositionMillis,
         lastQueueIds:
@@ -114,6 +120,7 @@ class PulsePreferences {
         'volumeLevel': volumeLevel.name,
         'monoAudio': monoAudio,
         'lastTrackId': lastTrackId,
+        'lastAccountFingerprint': lastAccountFingerprint,
         'lastPositionMillis': lastPositionMillis,
         'lastQueueIds': lastQueueIds,
       };
@@ -165,6 +172,7 @@ class PulsePreferences {
             PulseVolumeLevel.normal,
         monoAudio: json['monoAudio'] == true,
         lastTrackId: json['lastTrackId'] as String?,
+        lastAccountFingerprint: json['lastAccountFingerprint'] as String?,
         lastPositionMillis: json['lastPositionMillis'] is int
             ? json['lastPositionMillis'] as int
             : 0,

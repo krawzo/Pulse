@@ -36,7 +36,8 @@ class PulseApp extends StatefulWidget {
   State<PulseApp> createState() => _PulseAppState();
 }
 
-class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
+class _PulseAppState extends State<PulseApp>
+    with WidgetsBindingObserver, WindowListener {
   late final LibraryController _library;
   late final PlaybackController _playback;
   late final PulseConnectController _connect;
@@ -50,11 +51,16 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
   StreamSubscription<void>? _noisySubscription;
   bool _wasPlayingLocally = false;
   Future<void> _focusOperation = Future<void>.value();
+  Timer? _windowsOutputTimer;
+  String? _windowsOutputName;
+  bool _windowsOutputInitialized = false;
+  bool _checkingWindowsOutput = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (Platform.isWindows) windowManager.addListener(this);
     _library = LibraryController(WindowsLibraryStore());
     _jellyfin = JellyfinController();
     _preferencesStore = PulsePreferencesStore();
@@ -66,19 +72,26 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
         remoteStreamUrl: _jellyfin.streamUrl,
         activateLocalAudio: Platform.isAndroid ? _activateMobileAudio : null,
         onCheckpoint: (checkpoint) {
-          if (Platform.isAndroid) {
-            unawaited(_jellyfin.saveNavidromeQueue(checkpoint.trackId,
-                checkpoint.positionMillis, checkpoint.queueIds));
-          }
+          unawaited(_jellyfin.saveNavidromeQueue(checkpoint.trackId,
+              checkpoint.positionMillis, checkpoint.queueIds,
+              force: checkpoint.force));
           if (!_preferences.continuePlayback) return;
           _preferences = _preferences.copyWith(
               lastTrackId: checkpoint.trackId,
+              lastAccountFingerprint: _jellyfin.accountFingerprint ?? '',
               lastPositionMillis: checkpoint.positionMillis,
               lastQueueIds: checkpoint.queueIds);
           unawaited(
               _preferencesStore.save(_preferences).catchError((Object _) {}));
         });
     if (Platform.isAndroid) _playback.addListener(_syncMobileAudioFocus);
+    if (Platform.isWindows) {
+      unawaited(_checkWindowsAudioOutput());
+      _windowsOutputTimer = Timer.periodic(
+        const Duration(milliseconds: 250),
+        (_) => unawaited(_checkWindowsAudioOutput()),
+      );
+    }
     widget.audioHandler?.bind(_playback);
     _connect = PulseConnectController(playback: _playback, jellyfin: _jellyfin);
     _jellyfinRestore = _jellyfin.restore();
@@ -105,15 +118,41 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
     await session.configure(const AudioSessionConfiguration.music());
     _interruptionSubscription = session.interruptionEventStream.listen((event) {
       if (event.begin && _playback.isPlaying && !_playback.isRemoteOutput) {
-        unawaited(_playback.togglePlayback());
+        unawaited(_playback.pause());
       }
     });
     _noisySubscription = session.becomingNoisyEventStream.listen((_) {
       if (_playback.isPlaying && !_playback.isRemoteOutput) {
-        unawaited(_playback.togglePlayback());
+        unawaited(_playback.pause());
       }
     });
     return session;
+  }
+
+  Future<void> _checkWindowsAudioOutput() async {
+    if (_checkingWindowsOutput) return;
+    _checkingWindowsOutput = true;
+    try {
+      final name = await const MethodChannel('pulse/window')
+          .invokeMethod<String>('getAudioOutput');
+      if (!mounted) return;
+      final next = name?.trim();
+      if (_windowsOutputInitialized &&
+          _windowsOutputName != null &&
+          _windowsOutputName != next &&
+          _playback.isPlaying &&
+          !_playback.isRemoteOutput) {
+        await _playback.pause();
+      }
+      _windowsOutputName = next;
+      _windowsOutputInitialized = true;
+    } on PlatformException {
+      // Keep playback working if Windows cannot report its audio endpoint.
+    } on MissingPluginException {
+      // Older runners do not expose the audio endpoint channel.
+    } finally {
+      _checkingWindowsOutput = false;
+    }
   }
 
   Future<bool> _activateMobileAudio() async {
@@ -185,8 +224,7 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
               : 'A última faixa não está mais na biblioteca. Escolha uma faixa para continuar.';
         }
       }
-      if (Platform.isAndroid &&
-          _preferences.continuePlayback &&
+      if (_preferences.continuePlayback &&
           _preferences.lastTrackId == null) {
         unawaited(_restoreNavidromeQueue());
       }
@@ -207,14 +245,15 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
 
   Future<void> _restoreRemoteCheckpoint() async {
     await _jellyfinRestore;
-    final savedId = _preferences.lastTrackId;
-    if (Platform.isAndroid &&
-        _jellyfin.serverKind == MusicServerKind.navidrome &&
-        savedId?.startsWith('jellyfin:') == true) {
+    if (_jellyfin.serverKind == MusicServerKind.navidrome) {
       await _restoreNavidromeQueue();
-      return;
+      if (_playback.currentTrack != null ||
+          _preferences.lastAccountFingerprint != _jellyfin.accountFingerprint) {
+        return;
+      }
     }
     if (!mounted ||
+        !_preferences.continuePlayback ||
         _playback.currentTrack != null ||
         !_preferences.continuePlayback ||
         _preferences.lastTrackId == null) {
@@ -252,6 +291,24 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
       );
     } on Object {
       // The server queue is optional; local navigation remains available.
+    }
+  }
+
+  Future<void> _syncNavidromeQueueOnResume() async {
+    await _jellyfinRestore;
+    if (!mounted ||
+        !_preferences.continuePlayback ||
+        _playback.isPlaying ||
+        _jellyfin.serverKind != MusicServerKind.navidrome) {
+      return;
+    }
+    try {
+      final saved = await _jellyfin.savedNavidromeQueue();
+      if (!mounted || saved == null || _playback.isPlaying) return;
+      _playback.restoreCheckpoint(_jellyfin.tracks, saved.trackId,
+          saved.positionMillis, saved.queueIds);
+    } on Object {
+      // Keep the paused local view when the server is unreachable.
     }
   }
 
@@ -328,6 +385,8 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (Platform.isWindows) windowManager.removeListener(this);
+    _windowsOutputTimer?.cancel();
     _playback.persistCheckpoint();
     if (Platform.isAndroid) _playback.removeListener(_syncMobileAudioFocus);
     unawaited(_interruptionSubscription?.cancel());
@@ -342,12 +401,21 @@ class _PulseAppState extends State<PulseApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_syncNavidromeQueueOnResume());
+    }
     if (Platform.isAndroid &&
         (state == AppLifecycleState.inactive ||
             state == AppLifecycleState.paused ||
             state == AppLifecycleState.hidden)) {
       _playback.persistCheckpoint();
     }
+  }
+
+  @override
+  void onWindowFocus() {
+    unawaited(_jellyfin.warmConnection());
+    unawaited(_syncNavidromeQueueOnResume());
   }
 
   @override

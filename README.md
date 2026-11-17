@@ -6,12 +6,15 @@ A proposta é manter a experiência de ouvir música simples sem depender de um 
 
 ## Baixar
 
-A versão publicada aqui é **0.3.54 (build 73), beta**. Os arquivos prontos para instalar estão na pasta [executaveis](executaveis/):
+A versão publicada aqui é **0.3.57 (build 76), beta**. Os arquivos prontos para instalar estão na pasta [executaveis](executaveis/):
 
-- [APK para Android](executaveis/Pulse-Mobile-Beta-v0.3.54-build73.apk)
-- [Instalador para Windows](executaveis/Pulse-Desktop-Instalador-Beta-v0.3.54-build73.exe)
+- [APK para Android](executaveis/Pulse-Mobile-Beta-v0.3.57-build76.apk)
+- [Instalador para Windows](executaveis/Pulse-Desktop-Instalador-Beta-v0.3.57-build76.exe)
+- [Windows portátil](executaveis/Pulse-Desktop-Portatil-Beta-v0.3.57-build76.zip)
 
-Eles também estão disponíveis na [release v0.3.54-build73](https://github.com/krawzo/Pulse/releases/tag/v0.3.54-build73). No Android, abra o APK no celular. No Windows, execute o instalador EXE.
+Eles também estão disponíveis na [release v0.3.57-build76](https://github.com/krawzo/Pulse/releases/tag/v0.3.57-build76). No Android, abra o APK no celular. No Windows, execute o instalador EXE ou extraia o ZIP portátil e abra `pulse_flutter.exe`.
+
+Nesta beta, o cabeçalho da playlist acompanha a rolagem e dá lugar a uma barra compacta com capa, nome e reprodução.
 
 ## Código e documentação
 

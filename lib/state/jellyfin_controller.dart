@@ -136,7 +136,8 @@ class JellyfinController extends ChangeNotifier {
   }
 
   Future<void> saveNavidromeQueue(
-      String trackId, int positionMillis, List<String> queueIds) async {
+      String trackId, int positionMillis, List<String> queueIds,
+      {bool force = false}) async {
     final client = _client;
     if (_serverKind != MusicServerKind.navidrome ||
         client is! NavidromeClient ||
@@ -148,14 +149,12 @@ class JellyfinController extends ChangeNotifier {
     }
     final signature = '$trackId|${queueIds.join(',')}';
     final now = DateTime.now();
-    if (signature == _lastNavidromeQueueSignature &&
+    if (!force && signature == _lastNavidromeQueueSignature &&
         _lastNavidromeQueueSave != null &&
         now.difference(_lastNavidromeQueueSave!) <
             const Duration(seconds: 30)) {
       return;
     }
-    _lastNavidromeQueueSignature = signature;
-    _lastNavidromeQueueSave = now;
     final current = trackId.substring('navidrome:'.length);
     final ids = queueIds
         .map((id) => id.substring('navidrome:'.length))
@@ -164,6 +163,8 @@ class JellyfinController extends ChangeNotifier {
       if (!identical(_client, client)) return;
       try {
         await client.savePlayQueue(ids, current, positionMillis);
+        _lastNavidromeQueueSignature = signature;
+        _lastNavidromeQueueSave = now;
       } on Object {
         // Local playback and its checkpoint remain usable without the server.
       }
@@ -173,6 +174,7 @@ class JellyfinController extends ChangeNotifier {
 
   Future<({String trackId, int positionMillis, List<String> queueIds})?>
       savedNavidromeQueue() async {
+    await _queueWrite;
     final client = _client;
     if (_serverKind != MusicServerKind.navidrome ||
         client is! NavidromeClient ||

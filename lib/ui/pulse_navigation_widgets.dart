@@ -17,6 +17,7 @@ class PulseExpandedSidebar extends StatelessWidget {
     required this.onSelectPlaylist,
     required this.onSelectRemotePlaylist,
     this.onPlaylistContextMenu,
+    this.onRemotePlaylistContextMenu,
     this.selectedRemotePlaylistId,
     required this.onCreatePlaylist,
     required this.onFocusSearch,
@@ -36,6 +37,8 @@ class PulseExpandedSidebar extends StatelessWidget {
   final ValueChanged<String> onSelectRemotePlaylist;
   final void Function(String playlistId, Offset position)?
       onPlaylistContextMenu;
+  final void Function(String playlistId, Offset position)?
+      onRemotePlaylistContextMenu;
   final VoidCallback? onCreatePlaylist;
   final VoidCallback onFocusSearch;
   final VoidCallback? onCollapse;
@@ -44,6 +47,8 @@ class PulseExpandedSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final light = Theme.of(context).brightness == Brightness.light;
     final palette = PulsePaletteTheme.of(context);
+    final orderedPlaylists = [...playlists]
+      ..sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
     const destinations = [
       (PulseDestination.library, 'Biblioteca', Icons.library_music_outlined),
       (PulseDestination.tracks, 'Faixas', Icons.music_note_rounded),
@@ -200,14 +205,16 @@ class PulseExpandedSidebar extends StatelessWidget {
                       ),
                     )
                   else
-                    for (final playlist in playlists)
+                    for (final playlist in orderedPlaylists)
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 18,
                           vertical: 1,
                         ),
                         child: _PulseNavigationItem(
-                          icon: Icons.queue_music_rounded,
+                          icon: playlist.pinned
+                              ? Icons.push_pin_rounded
+                              : Icons.queue_music_rounded,
                           label: playlist.folderName == null
                               ? playlist.name
                               : '${playlist.folderName} / ${playlist.name}',
@@ -233,6 +240,11 @@ class PulseExpandedSidebar extends StatelessWidget {
                           selected: selected == PulseDestination.playlists &&
                               selectedRemotePlaylistId == id,
                           onTap: () => onSelectRemotePlaylist(id),
+                          onSecondaryTapDown: onRemotePlaylistContextMenu ==
+                                  null
+                              ? null
+                              : (position) =>
+                                  onRemotePlaylistContextMenu!(id, position),
                         ),
                       ),
                 ],

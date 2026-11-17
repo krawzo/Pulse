@@ -7,10 +7,15 @@ import 'pulse_track_artwork.dart';
 
 class PulseQueuePanel extends StatelessWidget {
   const PulseQueuePanel(
-      {super.key, required this.playback, required this.onClose});
+      {super.key,
+      required this.playback,
+      required this.onClose,
+      required this.onTrackContextMenu});
 
   final PlaybackController playback;
   final VoidCallback onClose;
+  final void Function(AudioTrack track, int index, Offset position)
+      onTrackContextMenu;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -96,37 +101,42 @@ class PulseQueuePanel extends StatelessWidget {
     return Material(
       key: key,
       color: Colors.transparent,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-        minTileHeight: 64,
-        hoverColor: palette.hover,
-        leading: PulseTrackArtwork(
-            track: track,
-            title: track.title,
-            creator: track.artist ?? '',
-            size: 48,
-            borderRadius: 4),
-        title: Text(track.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: active ? palette.accent : null)),
-        subtitle: Text(
-            track.source == AudioSource.jellyfin
-                ? '${track.artist ?? 'Artista não informado'} • Jellyfin'
-                : track.artist ?? 'Artista não informado',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis),
-        trailing: dragIndex == null
-            ? null
-            : ReorderableDragStartListener(
-                index: dragIndex,
-                child: Tooltip(
-                  message: 'Arrastar para mudar a ordem',
-                  child: Icon(Icons.drag_handle_rounded,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onSecondaryTapDown: (details) =>
+            onTrackContextMenu(track, index, details.globalPosition),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          minTileHeight: 64,
+          hoverColor: palette.hover,
+          leading: PulseTrackArtwork(
+              track: track,
+              title: track.title,
+              creator: track.artist ?? '',
+              size: 48,
+              borderRadius: 4),
+          title: Text(track.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: active ? palette.accent : null)),
+          subtitle: Text(
+              track.source == AudioSource.jellyfin
+                  ? '${track.artist ?? 'Artista não informado'} • Jellyfin'
+                  : track.artist ?? 'Artista não informado',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+          trailing: dragIndex == null
+              ? null
+              : ReorderableDragStartListener(
+                  index: dragIndex,
+                  child: Tooltip(
+                    message: 'Arrastar para mudar a ordem',
+                    child: Icon(Icons.drag_handle_rounded,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
                 ),
-              ),
-        onTap: () => playback.playQueueItem(index),
+          onTap: () => playback.playQueueItem(index),
+        ),
       ),
     );
   }

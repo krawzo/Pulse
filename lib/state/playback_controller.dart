@@ -32,7 +32,7 @@ class PlaybackController extends ChangeNotifier {
   String? _completedRemoteSessionId;
   final Random _random;
   final ValueChanged<
-          ({String trackId, int positionMillis, List<String> queueIds})>?
+          ({String trackId, int positionMillis, List<String> queueIds, bool force})>?
       onCheckpoint;
   @visibleForTesting
   final Future<void> Function(AudioTrack track, Duration position)? onPlayTrack;
@@ -742,7 +742,7 @@ class PlaybackController extends ChangeNotifier {
         if (_crossfading) await _crossfadePlayer?.pause();
       }
       _isPlaying = false;
-      _saveCheckpoint();
+      _saveCheckpoint(force: true);
       notifyListeners();
     } on Object catch (error) {
       _setError(error);
@@ -983,13 +983,14 @@ class PlaybackController extends ChangeNotifier {
         (queueIds.every(tracksById.containsKey) && queueIds.contains(trackId));
   }
 
-  void _saveCheckpoint() {
+  void _saveCheckpoint({bool force = false}) {
     final track = currentTrack;
     if (track != null && !track.id.startsWith('pulse-incoming:')) {
       onCheckpoint?.call((
         trackId: track.id,
         positionMillis: _position.inMilliseconds,
         queueIds: _queue.map((track) => track.id).toList(growable: false),
+        force: force,
       ));
     }
   }

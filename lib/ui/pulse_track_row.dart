@@ -59,6 +59,7 @@ class PulseTrackRow extends StatefulWidget {
 class _PulseTrackRowState extends State<PulseTrackRow> {
   bool _hovered = false;
   final GlobalKey _menuButtonKey = GlobalKey();
+  Offset? _contextMenuPosition;
 
   @override
   Widget build(BuildContext context) {
@@ -314,13 +315,37 @@ class _PulseTrackRowState extends State<PulseTrackRow> {
           ),
         );
         return desktop || constraints.maxWidth >= 600
-            ? row
+            ? GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onSecondaryTapDown: (details) =>
+                    _showContextMenu(details.globalPosition),
+                child: row,
+              )
             : PulseMobileTrackSwipe(
                 onPlayNext: widget.onPlayNext,
                 child: row,
               );
       },
     );
+  }
+
+  Future<void> _showContextMenu(Offset globalPosition) async {
+    final overlay = Overlay.of(context).context.findRenderObject();
+    if (overlay is! RenderBox) return;
+    final position = overlay.globalToLocal(globalPosition);
+    _contextMenuPosition = position;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy,
+          overlay.size.width - position.dx, overlay.size.height - position.dy),
+      constraints: const BoxConstraints(minWidth: 240, maxWidth: 300),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 12,
+      items: _buildMenuItems(context),
+    );
+    if (!mounted) return;
+    if (selected != null) await _onMenuSelected(selected);
+    _contextMenuPosition = null;
   }
 
   List<PopupMenuEntry<String>> _buildMenuItems(BuildContext context) {
@@ -478,6 +503,22 @@ class _PulseTrackRowState extends State<PulseTrackRow> {
       ];
 
   Future<T?> _showSubmenu<T>(List<PopupMenuEntry<T>> items) async {
+    if (_contextMenuPosition case final position?) {
+      final overlay = Overlay.of(context).context.findRenderObject();
+      if (overlay is! RenderBox) return null;
+      return showMenu<T>(
+        context: context,
+        position: RelativeRect.fromLTRB(
+            position.dx,
+            position.dy,
+            overlay.size.width - position.dx,
+            overlay.size.height - position.dy),
+        constraints: const BoxConstraints(minWidth: 240, maxWidth: 300),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 12,
+        items: items,
+      );
+    }
     final buttonContext = _menuButtonKey.currentContext;
     if (buttonContext == null) return null;
     final button = buttonContext.findRenderObject();
