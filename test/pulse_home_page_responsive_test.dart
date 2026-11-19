@@ -1909,6 +1909,7 @@ void main() {
       width: 1280,
       library: library,
       playback: playback,
+      showLocalFiles: true,
     );
     expect(find.byTooltip('Voltar'), findsOneWidget);
     expect(find.byTooltip('Avançar'), findsOneWidget);
@@ -2565,6 +2566,7 @@ Future<void> _pumpPulsePage(
   PulseDensity density = PulseDensity.compact,
   PulseAppearance appearance = PulseAppearance.dark,
   PulsePalette palette = PulsePalette.navyGreen,
+  bool showLocalFiles = false,
   bool settle = true,
   String? reviewKey,
 }) async {
@@ -2578,6 +2580,7 @@ Future<void> _pumpPulsePage(
       density: density,
       appearance: appearance,
       palette: palette,
+      showLocalFiles: showLocalFiles,
     ),
   );
   if (settle) {
@@ -2835,9 +2838,13 @@ Widget _reviewApp({
   PulseDensity density = PulseDensity.compact,
   PulseAppearance appearance = PulseAppearance.dark,
   PulsePalette palette = PulsePalette.navyGreen,
+  bool showLocalFiles = false,
 }) {
   var preferences = PulsePreferences(
-      density: density, appearance: appearance, palette: palette);
+      density: density,
+      appearance: appearance,
+      palette: palette,
+      showLocalFiles: showLocalFiles);
   return MaterialApp(
     key: key,
     title: 'Pulse',

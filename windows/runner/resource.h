@@ -3,6 +3,12 @@
 // Used by Runner.rc
 //
 #define IDI_APP_ICON                    101
+#define IDI_TASKBAR_FAVORITE            102
+#define IDI_TASKBAR_FAVORITE_ON         103
+#define IDI_TASKBAR_PREVIOUS            104
+#define IDI_TASKBAR_PLAY                105
+#define IDI_TASKBAR_PAUSE               106
+#define IDI_TASKBAR_NEXT                107
 
 // Next default values for new objects
 //

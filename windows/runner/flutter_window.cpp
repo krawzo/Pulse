@@ -19,6 +19,20 @@ constexpr UINT kTrayCallbackMessage = WM_APP + 1;
 constexpr UINT kTrayIconId = 1;
 constexpr UINT kTrayOpenCommand = 1001;
 constexpr UINT kTrayExitCommand = 1002;
+constexpr UINT kTaskbarFavoriteCommand = 2001;
+constexpr UINT kTaskbarPreviousCommand = 2002;
+constexpr UINT kTaskbarPlayCommand = 2003;
+constexpr UINT kTaskbarNextCommand = 2004;
+
+bool ReadBool(const flutter::EncodableMap& values, const char* key,
+              bool* output) {
+  const auto found = values.find(flutter::EncodableValue(key));
+  if (found == values.end()) return false;
+  const auto* value = std::get_if<bool>(&found->second);
+  if (value == nullptr) return false;
+  *output = *value;
+  return true;
+}
 
 struct AccentPolicy {
   int state;
@@ -113,6 +127,8 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
+  taskbar_button_created_message_ =
+      RegisterWindowMessageW(L"TaskbarButtonCreated");
   window_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       flutter_controller_->engine()->messenger(), "pulse/window",
       &flutter::StandardMethodCodec::GetInstance());
@@ -144,6 +160,24 @@ bool FlutterWindow::OnCreate() {
           } else {
             result->Error("unsupported", "Windows acrylic is unavailable.");
           }
+        } else if (call.method_name() == "setTaskbarPlayback") {
+          const auto* values =
+              std::get_if<flutter::EncodableMap>(call.arguments());
+          bool has_track = false;
+          bool is_playing = false;
+          bool is_favorite = false;
+          if (values == nullptr ||
+              !ReadBool(*values, "hasTrack", &has_track) ||
+              !ReadBool(*values, "isPlaying", &is_playing) ||
+              !ReadBool(*values, "isFavorite", &is_favorite)) {
+            result->Error("invalid_arguments", "Expected playback flags.");
+          } else {
+            taskbar_has_track_ = has_track;
+            taskbar_is_playing_ = is_playing;
+            taskbar_is_favorite_ = is_favorite;
+            UpdateTaskbarButtons(GetHandle());
+            result->Success();
+          }
         } else if (call.method_name() == "quit") {
           close_to_minimize_ = false;
           SetCloseToMinimize(false);
@@ -168,6 +202,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  ResetTaskbarButtons();
   RemoveTrayIcon(GetHandle());
   window_channel_.reset();
   if (flutter_controller_) {
@@ -175,6 +210,82 @@ void FlutterWindow::OnDestroy() {
   }
 
   Win32Window::OnDestroy();
+}
+
+void FlutterWindow::ResetTaskbarButtons() {
+  taskbar_buttons_added_ = false;
+  if (taskbar_ != nullptr) {
+    taskbar_->Release();
+    taskbar_ = nullptr;
+  }
+}
+
+void FlutterWindow::AddTaskbarButtons(HWND window) {
+  if (taskbar_buttons_added_) return;
+  if (taskbar_ == nullptr) {
+    if (FAILED(CoCreateInstance(CLSID_TaskbarList, nullptr,
+                                CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbar_)))) {
+      return;
+    }
+    if (FAILED(taskbar_->HrInit())) {
+      ResetTaskbarButtons();
+      return;
+    }
+  }
+  THUMBBUTTON buttons[4]{};
+  const UINT ids[] = {kTaskbarFavoriteCommand, kTaskbarPreviousCommand,
+                      kTaskbarPlayCommand, kTaskbarNextCommand};
+  const int icons[] = {IDI_TASKBAR_FAVORITE, IDI_TASKBAR_PREVIOUS,
+                       IDI_TASKBAR_PLAY, IDI_TASKBAR_NEXT};
+  const wchar_t* tips[] = {L"Adicionar aos favoritos", L"Faixa anterior",
+                           L"Reproduzir", L"Proxima faixa"};
+  for (int index = 0; index < 4; ++index) {
+    buttons[index].dwMask = THB_ICON | THB_TOOLTIP | THB_FLAGS;
+    buttons[index].iId = ids[index];
+    buttons[index].hIcon = LoadIconW(GetModuleHandleW(nullptr),
+                                     MAKEINTRESOURCEW(icons[index]));
+    lstrcpynW(buttons[index].szTip, tips[index],
+             ARRAYSIZE(buttons[index].szTip));
+    buttons[index].dwFlags = THBF_DISABLED;
+  }
+  if (SUCCEEDED(taskbar_->ThumbBarAddButtons(window, 4, buttons))) {
+    taskbar_buttons_added_ = true;
+    UpdateTaskbarButtons(window);
+  }
+}
+
+void FlutterWindow::UpdateTaskbarButtons(HWND window) {
+  if (!taskbar_buttons_added_ || taskbar_ == nullptr) return;
+  THUMBBUTTON buttons[4]{};
+  const UINT ids[] = {kTaskbarFavoriteCommand, kTaskbarPreviousCommand,
+                      kTaskbarPlayCommand, kTaskbarNextCommand};
+  const int icons[] = {
+      taskbar_is_favorite_ ? IDI_TASKBAR_FAVORITE_ON : IDI_TASKBAR_FAVORITE,
+      IDI_TASKBAR_PREVIOUS,
+      taskbar_is_playing_ ? IDI_TASKBAR_PAUSE : IDI_TASKBAR_PLAY,
+      IDI_TASKBAR_NEXT};
+  const wchar_t* tips[] = {
+      taskbar_is_favorite_ ? L"Remover dos favoritos"
+                           : L"Adicionar aos favoritos",
+      L"Faixa anterior", taskbar_is_playing_ ? L"Pausar" : L"Reproduzir",
+      L"Proxima faixa"};
+  for (int index = 0; index < 4; ++index) {
+    buttons[index].dwMask = THB_ICON | THB_TOOLTIP | THB_FLAGS;
+    buttons[index].iId = ids[index];
+    buttons[index].hIcon = LoadIconW(GetModuleHandleW(nullptr),
+                                     MAKEINTRESOURCEW(icons[index]));
+    lstrcpynW(buttons[index].szTip, tips[index],
+             ARRAYSIZE(buttons[index].szTip));
+    buttons[index].dwFlags = taskbar_has_track_ ? THBF_ENABLED : THBF_DISABLED;
+  }
+  taskbar_->ThumbBarUpdateButtons(window, 4, buttons);
+}
+
+void FlutterWindow::SendTaskbarAction(const char* action) {
+  if (window_channel_ == nullptr || !taskbar_has_track_) return;
+  window_channel_->InvokeMethod(
+      "taskbarAction",
+      std::make_unique<flutter::EncodableValue>(std::string(action)));
 }
 
 bool FlutterWindow::MinimizeToTray(HWND window) {
@@ -242,10 +353,27 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (taskbar_button_created_message_ != 0 &&
+      message == taskbar_button_created_message_) {
+    AddTaskbarButtons(hwnd);
+    return 0;
+  }
   if (taskbar_created_message_ != 0 &&
-      message == taskbar_created_message_ && tray_icon_added_) {
-    tray_icon_added_ = false;
-    MinimizeToTray(hwnd);
+      message == taskbar_created_message_) {
+    ResetTaskbarButtons();
+    if (tray_icon_added_) {
+      tray_icon_added_ = false;
+      MinimizeToTray(hwnd);
+    }
+    return 0;
+  }
+  if (message == WM_COMMAND && HIWORD(wparam) == THBN_CLICKED) {
+    switch (LOWORD(wparam)) {
+      case kTaskbarFavoriteCommand: SendTaskbarAction("favorite"); break;
+      case kTaskbarPreviousCommand: SendTaskbarAction("previous"); break;
+      case kTaskbarPlayCommand: SendTaskbarAction("playPause"); break;
+      case kTaskbarNextCommand: SendTaskbarAction("next"); break;
+    }
     return 0;
   }
   if (message == kTrayCallbackMessage) {

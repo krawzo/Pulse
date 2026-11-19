@@ -6,15 +6,15 @@ A proposta é manter a experiência de ouvir música simples sem depender de um 
 
 ## Baixar
 
-A versão publicada aqui é **0.3.57 (build 76), beta**. Os arquivos prontos para instalar estão na pasta [executaveis](executaveis/):
+A versão oficial para **Windows é 0.3.59 (build 78)**. Para **Android, a versão oficial continua 0.3.57 (build 76)**. Os arquivos prontos para instalar estão na pasta [executaveis](executaveis/):
 
-- [APK para Android](executaveis/Pulse-Mobile-Beta-v0.3.57-build76.apk)
-- [Instalador para Windows](executaveis/Pulse-Desktop-Instalador-Beta-v0.3.57-build76.exe)
-- [Windows portátil](executaveis/Pulse-Desktop-Portatil-Beta-v0.3.57-build76.zip)
+- [APK oficial para Android 0.3.57](executaveis/Pulse-Mobile-Oficial-v0.3.57-build76.apk)
+- [Instalador oficial para Windows 0.3.59](executaveis/Pulse-Desktop-Instalador-Oficial-v0.3.59-build78.exe)
+- [Windows portátil oficial 0.3.59](executaveis/Pulse-Desktop-Portatil-Oficial-v0.3.59-build78.zip)
 
-Eles também estão disponíveis na [release v0.3.57-build76](https://github.com/krawzo/Pulse/releases/tag/v0.3.57-build76). No Android, abra o APK no celular. No Windows, execute o instalador EXE ou extraia o ZIP portátil e abra `pulse_flutter.exe`.
+Eles também estão disponíveis na [release oficial v0.3.59-build78](https://github.com/krawzo/Pulse/releases/tag/v0.3.59-build78). No Android, abra o APK no celular. No Windows, execute o instalador EXE ou extraia o ZIP portátil e abra `pulse_flutter.exe`.
 
-Nesta beta, o cabeçalho da playlist acompanha a rolagem e dá lugar a uma barra compacta com capa, nome e reprodução.
+No Windows, a prévia na barra de tarefas oferece controles de favorito, faixa anterior, reproduzir/pausar e próxima faixa. Em Biblioteca > Tudo, músicas curtidas e playlists aparecem primeiro; o botão de ocultar a biblioteca foi removido. O cabeçalho da playlist acompanha a rolagem e dá lugar a uma barra compacta com capa, nome e reprodução.
 
 ## Código e documentação
 

@@ -1520,10 +1520,6 @@ class _PulseHomePageState extends State<PulseHomePage>
                                                           onFocusSearch: () =>
                                                               _searchFocusNode
                                                                   .requestFocus(),
-                                                          onCollapse: () =>
-                                                              setState(() =>
-                                                                  _libraryPanelOpen =
-                                                                      false),
                                                         ),
                                                 ),
                                               ),

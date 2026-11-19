@@ -20,7 +20,6 @@ class PulseDesktopLibrarySidebar extends StatefulWidget {
     required this.onPlaylistContextMenu,
     required this.onOpenAlbum,
     required this.onCreatePlaylist,
-    required this.onCollapse,
     required this.onFocusSearch,
     required this.playlists,
     required this.remotePlaylists,
@@ -43,7 +42,6 @@ class PulseDesktopLibrarySidebar extends StatefulWidget {
   final void Function(String playlistId, Offset position) onPlaylistContextMenu;
   final ValueChanged<String> onOpenAlbum;
   final VoidCallback? onCreatePlaylist;
-  final VoidCallback onCollapse;
   final VoidCallback onFocusSearch;
   final List<PulsePlaylist> playlists;
   final List<Map<String, dynamic>> remotePlaylists;
@@ -152,6 +150,7 @@ class _PulseDesktopLibrarySidebarState
               .take(4)
               .toList(),
           icon: Icons.favorite_rounded,
+          sortGroup: 0,
           selected: widget.selected == PulseDestination.favorites,
           onTap: () => widget.onSelect(PulseDestination.favorites),
         ),
@@ -171,6 +170,7 @@ class _PulseDesktopLibrarySidebarState
             icon: playlist.pinned
                 ? Icons.push_pin_rounded
                 : Icons.queue_music_rounded,
+            sortGroup: playlist.pinned ? 1 : 2,
             selected: widget.selected == PulseDestination.playlists &&
                 widget.selectedPlaylistId == playlist.id,
             onTap: () => widget.onSelectPlaylist(playlist.id),
@@ -188,6 +188,7 @@ class _PulseDesktopLibrarySidebarState
               identity: 'jellyfin-playlist:$id',
               artwork: const [],
               icon: Icons.queue_music_rounded,
+              sortGroup: 2,
               selected: widget.selected == PulseDestination.playlists &&
                   widget.selectedRemotePlaylistId == id,
               onTap: () => widget.onSelectRemotePlaylist(id),
@@ -204,10 +205,12 @@ class _PulseDesktopLibrarySidebarState
             identity: album.key,
             artwork: album.value,
             icon: Icons.album_rounded,
+            sortGroup: 3,
             selected: false,
             onTap: () => widget.onOpenAlbum(album.key),
           ),
-      if (filter == PulseDestination.artists)
+      if (filter == PulseDestination.library ||
+          filter == PulseDestination.artists)
         for (final artist in _artists.entries)
           _LibraryEntry(
             title: artist.key,
@@ -215,6 +218,7 @@ class _PulseDesktopLibrarySidebarState
             identity: artist.key,
             artwork: artist.value,
             icon: Icons.person_rounded,
+            sortGroup: 4,
             selected: false,
             onTap: () => widget.onSelect(PulseDestination.artists),
           ),
@@ -233,14 +237,9 @@ class _PulseDesktopLibrarySidebarState
                 widget.onTrackContextMenu(track, position),
           ),
     ];
-    final pinnedIds = widget.playlists
-        .where((playlist) => playlist.pinned)
-        .map((playlist) => playlist.id)
-        .toSet();
     entries.sort((a, b) {
-      final pinnedOrder = (pinnedIds.contains(b.identity) ? 1 : 0) -
-          (pinnedIds.contains(a.identity) ? 1 : 0);
-      if (pinnedOrder != 0) return pinnedOrder;
+      final groupOrder = a.sortGroup.compareTo(b.sortGroup);
+      if (groupOrder != 0) return groupOrder;
       return _reverse
           ? b.title.toLowerCase().compareTo(a.title.toLowerCase())
           : a.title.toLowerCase().compareTo(b.title.toLowerCase());
@@ -260,11 +259,6 @@ class _PulseDesktopLibrarySidebarState
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 8, 6),
           child: Row(children: [
-            IconButton(
-              tooltip: 'Ocultar biblioteca',
-              onPressed: widget.onCollapse,
-              icon: const Icon(Icons.chevron_left_rounded),
-            ),
             Expanded(
                 child: InkWell(
               onTap: () => widget.onSelect(PulseDestination.library),
@@ -507,7 +501,8 @@ class _LibraryEntry {
       required this.selected,
       required this.onTap,
       this.onPlay,
-      this.onSecondaryTapDown});
+      this.onSecondaryTapDown,
+      this.sortGroup = 5});
   final String title;
   final String subtitle;
   final String identity;
@@ -517,4 +512,5 @@ class _LibraryEntry {
   final VoidCallback onTap;
   final VoidCallback? onPlay;
   final ValueChanged<Offset>? onSecondaryTapDown;
+  final int sortGroup;
 }

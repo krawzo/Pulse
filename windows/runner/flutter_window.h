@@ -7,6 +7,7 @@
 #include <flutter/flutter_view_controller.h>
 
 #include <memory>
+#include <shobjidl.h>
 
 #include "win32_window.h"
 
@@ -29,6 +30,10 @@ class FlutterWindow : public Win32Window {
   void RestoreFromTray(HWND window);
   void RemoveTrayIcon(HWND window);
   void ShowTrayMenu(HWND window);
+  void AddTaskbarButtons(HWND window);
+  void UpdateTaskbarButtons(HWND window);
+  void ResetTaskbarButtons();
+  void SendTaskbarAction(const char* action);
 
   // The project to run.
   flutter::DartProject project_;
@@ -40,6 +45,12 @@ class FlutterWindow : public Win32Window {
   bool tray_icon_added_ = false;
   bool tray_restore_maximized_ = false;
   UINT taskbar_created_message_ = 0;
+  UINT taskbar_button_created_message_ = 0;
+  ITaskbarList3* taskbar_ = nullptr;
+  bool taskbar_buttons_added_ = false;
+  bool taskbar_has_track_ = false;
+  bool taskbar_is_playing_ = false;
+  bool taskbar_is_favorite_ = false;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

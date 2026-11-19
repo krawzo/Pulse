@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../data/windows_library_store.dart';
 import '../data/pulse_preferences_store.dart';
+import '../domain/audio_track.dart';
 import '../domain/pulse_preferences.dart';
 import '../state/library_controller.dart';
 import '../state/jellyfin_controller.dart';
@@ -38,6 +39,7 @@ class PulseApp extends StatefulWidget {
 
 class _PulseAppState extends State<PulseApp>
     with WidgetsBindingObserver, WindowListener {
+  static const _windowChannel = MethodChannel('pulse/window');
   late final LibraryController _library;
   late final PlaybackController _playback;
   late final PulseConnectController _connect;
@@ -55,6 +57,7 @@ class _PulseAppState extends State<PulseApp>
   String? _windowsOutputName;
   bool _windowsOutputInitialized = false;
   bool _checkingWindowsOutput = false;
+  String? _lastTaskbarPlaybackState;
 
   @override
   void initState() {
@@ -86,6 +89,11 @@ class _PulseAppState extends State<PulseApp>
         });
     if (Platform.isAndroid) _playback.addListener(_syncMobileAudioFocus);
     if (Platform.isWindows) {
+      _windowChannel.setMethodCallHandler(_handleWindowsTaskbarAction);
+      _playback.addListener(_syncWindowsTaskbarPlayback);
+      _library.addListener(_syncWindowsTaskbarPlayback);
+      _jellyfin.addListener(_syncWindowsTaskbarPlayback);
+      _syncWindowsTaskbarPlayback();
       unawaited(_checkWindowsAudioOutput());
       _windowsOutputTimer = Timer.periodic(
         const Duration(milliseconds: 250),
@@ -97,6 +105,51 @@ class _PulseAppState extends State<PulseApp>
     _jellyfinRestore = _jellyfin.restore();
     if (Platform.isAndroid) unawaited(_retryJellyfinCatalogAfterRestore());
     unawaited(_initialize());
+  }
+
+  Future<void> _handleWindowsTaskbarAction(MethodCall call) async {
+    if (call.method != 'taskbarAction' || !mounted) return;
+    final track = _playback.currentTrack;
+    if (track == null) return;
+    switch (call.arguments) {
+      case 'favorite':
+        if (track.source == AudioSource.jellyfin) {
+          await _jellyfin.toggleFavorite(track);
+        } else {
+          await _library.toggleFavorite(track);
+        }
+      case 'previous':
+        await _playback.skipPrevious();
+      case 'playPause':
+        await _playback.togglePlayback();
+      case 'next':
+        await _playback.skipNext();
+    }
+  }
+
+  void _syncWindowsTaskbarPlayback() {
+    final track = _playback.currentTrack;
+    final favorite = track != null &&
+        (track.source == AudioSource.jellyfin
+            ? _jellyfin.favoriteIds.contains(track.id)
+            : _library.snapshot.favoriteIds.contains(track.id));
+    final signature = '${track?.id}|${_playback.isPlaying}|$favorite';
+    if (_lastTaskbarPlaybackState == signature) return;
+    _lastTaskbarPlaybackState = signature;
+    unawaited(_sendWindowsTaskbarPlayback(track != null, favorite));
+  }
+
+  Future<void> _sendWindowsTaskbarPlayback(
+      bool hasTrack, bool isFavorite) async {
+    try {
+      await _windowChannel.invokeMethod<void>('setTaskbarPlayback', {
+        'hasTrack': hasTrack,
+        'isPlaying': _playback.isPlaying,
+        'isFavorite': isFavorite,
+      });
+    } on Object {
+      // The Flutter player remains usable if the shell preview is unavailable.
+    }
   }
 
   Future<void> _retryJellyfinCatalogAfterRestore() async {
@@ -224,8 +277,7 @@ class _PulseAppState extends State<PulseApp>
               : 'A última faixa não está mais na biblioteca. Escolha uma faixa para continuar.';
         }
       }
-      if (_preferences.continuePlayback &&
-          _preferences.lastTrackId == null) {
+      if (_preferences.continuePlayback && _preferences.lastTrackId == null) {
         unawaited(_restoreNavidromeQueue());
       }
     });
@@ -385,7 +437,13 @@ class _PulseAppState extends State<PulseApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (Platform.isWindows) windowManager.removeListener(this);
+    if (Platform.isWindows) {
+      windowManager.removeListener(this);
+      _windowChannel.setMethodCallHandler(null);
+      _playback.removeListener(_syncWindowsTaskbarPlayback);
+      _library.removeListener(_syncWindowsTaskbarPlayback);
+      _jellyfin.removeListener(_syncWindowsTaskbarPlayback);
+    }
     _windowsOutputTimer?.cancel();
     _playback.persistCheckpoint();
     if (Platform.isAndroid) _playback.removeListener(_syncMobileAudioFocus);
