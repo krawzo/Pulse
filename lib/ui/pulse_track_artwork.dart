@@ -14,6 +14,7 @@ class PulseTrackArtwork extends StatefulWidget {
     this.track,
     required this.title,
     this.artworkTracks,
+    this.artworkUrl,
     this.creator = '',
     this.fallbackIcon,
     this.size = 48,
@@ -22,6 +23,7 @@ class PulseTrackArtwork extends StatefulWidget {
 
   final AudioTrack? track;
   final List<AudioTrack>? artworkTracks;
+  final String? artworkUrl;
   final String title;
   final String creator;
   final IconData? fallbackIcon;
@@ -51,6 +53,7 @@ class _PulseTrackArtworkState extends State<PulseTrackArtwork> {
   }
 
   String _trackSignature(PulseTrackArtwork artwork) => [
+        artwork.artworkUrl ?? '',
         if (artwork.artworkTracks != null)
           ...artwork.artworkTracks!.map(
             (track) =>
@@ -82,9 +85,10 @@ class _PulseTrackArtworkState extends State<PulseTrackArtwork> {
             .where((item) =>
                 item.source == AudioSource.jellyfin && item.artworkUrl != null)
             .firstOrNull;
+    final remoteUrl = widget.artworkUrl ?? remoteTrack?.artworkUrl;
     _remoteFile =
-        (Platform.isAndroid || Platform.isWindows) && remoteTrack != null
-            ? RemoteArtworkCache.instance.imageFor(remoteTrack)
+        (Platform.isAndroid || Platform.isWindows) && remoteUrl != null
+            ? RemoteArtworkCache.instance.imageForUrl(remoteUrl)
             : null;
   }
 
@@ -108,12 +112,10 @@ class _PulseTrackArtworkState extends State<PulseTrackArtwork> {
                 track.source == AudioSource.jellyfin &&
                 track.artworkUrl != null)
             .firstOrNull;
-    final remoteUrl = remoteTrack?.artworkUrl;
+    final remoteUrl = widget.artworkUrl ?? remoteTrack?.artworkUrl;
     if (remoteUrl != null) {
       final imageUri = Uri.tryParse(remoteUrl);
-      final ready = remoteTrack == null
-          ? null
-          : RemoteArtworkCache.instance.readyImageFor(remoteTrack);
+      final ready = RemoteArtworkCache.instance.readyImageForUrl(remoteUrl);
       if (ready != null) {
         return ExcludeSemantics(
           child: ClipRRect(

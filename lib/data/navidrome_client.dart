@@ -229,7 +229,11 @@ class NavidromeClient implements MusicServerClient {
       for (final item
           in ((result['playlists'] as Map?)?['playlist'] as List? ?? const [])
               .whereType<Map>())
-        {'Id': item['id'], 'Name': item['name']},
+        {
+          'Id': item['id'],
+          'Name': item['name'],
+          'CoverArt': item['coverArt'],
+        },
     ];
   }
 

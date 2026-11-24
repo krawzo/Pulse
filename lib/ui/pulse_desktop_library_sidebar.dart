@@ -24,8 +24,10 @@ class PulseDesktopLibrarySidebar extends StatefulWidget {
     required this.playlists,
     required this.remotePlaylists,
     required this.remotePlaylistPrefix,
+    required this.remotePlaylistCoverUrl,
     required this.tracks,
     required this.favoriteIds,
+    required this.accountName,
     required this.width,
     this.selectedPlaylistId,
     this.selectedRemotePlaylistId,
@@ -46,8 +48,10 @@ class PulseDesktopLibrarySidebar extends StatefulWidget {
   final List<PulsePlaylist> playlists;
   final List<Map<String, dynamic>> remotePlaylists;
   final String remotePlaylistPrefix;
+  final String? Function(Map<String, dynamic>) remotePlaylistCoverUrl;
   final List<AudioTrack> tracks;
   final Set<String> favoriteIds;
+  final String? accountName;
   final String? selectedPlaylistId;
   final String? selectedRemotePlaylistId;
   final double width;
@@ -143,12 +147,11 @@ class _PulseDesktopLibrarySidebarState
       if (filter == PulseDestination.library)
         _LibraryEntry(
           title: 'Músicas curtidas',
-          subtitle: 'Playlist • ${widget.favoriteIds.length} faixas',
+          subtitle: widget.accountName?.trim().isNotEmpty == true
+              ? widget.accountName!.trim()
+              : 'Sua playlist',
           identity: 'favorites',
-          artwork: widget.tracks
-              .where((track) => widget.favoriteIds.contains(track.id))
-              .take(4)
-              .toList(),
+          artwork: const [],
           icon: Icons.favorite_rounded,
           sortGroup: 0,
           selected: widget.selected == PulseDestination.favorites,
@@ -187,6 +190,7 @@ class _PulseDesktopLibrarySidebarState
               subtitle: 'Playlist • Jellyfin',
               identity: 'jellyfin-playlist:$id',
               artwork: const [],
+              artworkUrl: widget.remotePlaylistCoverUrl(playlist),
               icon: Icons.queue_music_rounded,
               sortGroup: 2,
               selected: widget.selected == PulseDestination.playlists &&
@@ -392,14 +396,18 @@ class _PulseDesktopLibrarySidebarState
                       horizontal: 8, vertical: widget.compact ? 3 : 6),
                   child: Row(children: [
                     Stack(alignment: Alignment.center, children: [
-                      PulseTrackArtwork(
-                        artworkTracks: entry.artwork,
-                        title: entry.title,
-                        creator: entry.identity,
-                        fallbackIcon: entry.icon,
-                        size: widget.compact ? 36 : 48,
-                        borderRadius: entry.identity == 'favorites' ? 4 : 3,
-                      ),
+                      if (entry.identity == 'favorites')
+                        _LikedSongsArtwork(size: widget.compact ? 36 : 48)
+                      else
+                        PulseTrackArtwork(
+                          artworkTracks: entry.artwork,
+                          artworkUrl: entry.artworkUrl,
+                          title: entry.title,
+                          creator: entry.identity,
+                          fallbackIcon: entry.icon,
+                          size: widget.compact ? 36 : 48,
+                          borderRadius: 3,
+                        ),
                       if (entry.onPlay != null &&
                           _hoveredEntryId == entry.identity)
                         Positioned.fill(
@@ -442,15 +450,28 @@ class _PulseDesktopLibrarySidebarState
                                 .bodyMedium
                                 ?.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: entry.selected ? palette.accent : null,
+                                  color: entry.identity == 'favorites' ||
+                                          entry.selected
+                                      ? palette.accent
+                                      : null,
                                 )),
-                        Text(entry.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: palette.mutedInk)),
+                        Row(children: [
+                          if (entry.identity == 'favorites')
+                            Padding(
+                              padding: const EdgeInsets.only(right: 3),
+                              child: Icon(Icons.push_pin_rounded,
+                                  size: 13, color: palette.accent),
+                            ),
+                          Expanded(
+                            child: Text(entry.subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: palette.mutedInk)),
+                          ),
+                        ]),
                       ],
                     )),
                   ]),
@@ -462,6 +483,34 @@ class _PulseDesktopLibrarySidebarState
       ]),
     );
   }
+}
+
+class _LikedSongsArtwork extends StatelessWidget {
+  const _LikedSongsArtwork({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        image: true,
+        label: 'Capa de Músicas curtidas',
+        child: ExcludeSemantics(
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              gradient: const LinearGradient(
+                begin: Alignment.bottomLeft,
+                end: Alignment.topRight,
+                colors: [Color(0xFF4C32DD), Color(0xFFA3B5FF)],
+              ),
+            ),
+            child: Icon(Icons.favorite_rounded,
+                size: size * .47, color: Colors.white),
+          ),
+        ),
+      );
 }
 
 class _FilterScrollArrow extends StatelessWidget {
@@ -501,12 +550,14 @@ class _LibraryEntry {
       required this.selected,
       required this.onTap,
       this.onPlay,
+      this.artworkUrl,
       this.onSecondaryTapDown,
       this.sortGroup = 5});
   final String title;
   final String subtitle;
   final String identity;
   final List<AudioTrack> artwork;
+  final String? artworkUrl;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;

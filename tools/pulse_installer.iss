@@ -31,7 +31,7 @@ WizardStyle=modern
 SetupIconFile={#IconPath}
 OutputDir={#OutputDir}
 OutputBaseFilename=Pulse-Desktop-Instalador-v{#AppVersion}-build{#AppBuild}
-CloseApplications=yes
+CloseApplications=force
 RestartApplications=no
 
 [Languages]
@@ -48,4 +48,23 @@ Name: "{group}\Pulse"; Filename: "{app}\pulse_flutter.exe"
 Name: "{autodesktop}\Pulse"; Filename: "{app}\pulse_flutter.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\pulse_flutter.exe"; Description: "Abrir Pulse"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\pulse_flutter.exe"; Description: "Abrir Pulse atualizado"; Flags: nowait runasoriginaluser
+
+[Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+  // Close installed and portable copies before replacing any application file.
+  if not Exec(ExpandConstant('{sys}\taskkill.exe'),
+    '/F /IM pulse_flutter.exe', '', SW_HIDE, ewWaitUntilTerminated,
+    ResultCode) then
+  begin
+    Result := 'Não foi possível encerrar o Pulse antes da atualização.';
+    Exit;
+  end;
+  // taskkill returns 128 when Pulse was not running.
+  if (ResultCode <> 0) and (ResultCode <> 128) then
+    Result := 'O Pulse ainda está aberto. Feche-o e tente instalar novamente.';
+end;

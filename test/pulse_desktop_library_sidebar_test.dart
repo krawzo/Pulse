@@ -46,8 +46,10 @@ void main() {
             {'Id': 'a', 'Name': 'Adoração'},
           ],
           remotePlaylistPrefix: 'navidrome',
+          remotePlaylistCoverUrl: (_) => null,
           tracks: const [track],
           favoriteIds: const {'song-1'},
+          accountName: 'Marlus',
           width: 340,
         ),
       ),
@@ -66,5 +68,7 @@ void main() {
         labels.map((label) => tester.getTopLeft(find.text(label).first).dy);
     expect(y.toList(), orderedEquals([...y]..sort()));
     expect(find.byTooltip('Ocultar biblioteca'), findsNothing);
+    expect(find.text('Marlus'), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
   });
 }

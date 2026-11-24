@@ -16,6 +16,7 @@
 
 namespace {
 constexpr UINT kTrayCallbackMessage = WM_APP + 1;
+constexpr UINT kPulseActivateMessage = WM_APP + 10;
 constexpr UINT kTrayIconId = 1;
 constexpr UINT kTrayOpenCommand = 1001;
 constexpr UINT kTrayExitCommand = 1002;
@@ -353,6 +354,15 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == kPulseActivateMessage) {
+    if (tray_icon_added_) {
+      RestoreFromTray(hwnd);
+    } else {
+      ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
+      SetForegroundWindow(hwnd);
+    }
+    return 0;
+  }
   if (taskbar_button_created_message_ != 0 &&
       message == taskbar_button_created_message_) {
     AddTaskbarButtons(hwnd);

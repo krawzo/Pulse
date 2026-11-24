@@ -29,14 +29,16 @@ class RemoteArtworkCache {
     _ready.clear();
   }
 
-  File? readyImageFor(AudioTrack track) {
-    final key = _keyFor(track);
+  File? readyImageFor(AudioTrack track) => readyImageForUrl(track.artworkUrl);
+
+  File? readyImageForUrl(String? artworkUrl) {
+    final key = _keyFor(artworkUrl);
     return key == null ? null : _ready[key];
   }
 
-  String? _keyFor(AudioTrack track) {
+  String? _keyFor(String? artworkUrl) {
     final account = _account;
-    final uri = Uri.tryParse(track.artworkUrl ?? '');
+    final uri = Uri.tryParse(artworkUrl ?? '');
     if (account == null ||
         uri == null ||
         uri.scheme != 'http' ||
@@ -50,9 +52,11 @@ class RemoteArtworkCache {
         .toString();
   }
 
-  Future<File?> imageFor(AudioTrack track) {
+  Future<File?> imageFor(AudioTrack track) => imageForUrl(track.artworkUrl);
+
+  Future<File?> imageForUrl(String? artworkUrl) {
     final account = _account;
-    final uri = Uri.tryParse(track.artworkUrl ?? '');
+    final uri = Uri.tryParse(artworkUrl ?? '');
     if (!(Platform.isAndroid || Platform.isWindows) ||
         account == null ||
         uri == null ||
@@ -63,7 +67,7 @@ class RemoteArtworkCache {
       return Future.value(null);
     }
     // The proxy port and nonce change at each start; the image ID does not.
-    final key = _keyFor(track)!;
+    final key = _keyFor(artworkUrl)!;
     if (_ready[key] case final ready?) return Future.value(ready);
     return _inFlight.putIfAbsent(key, () async {
       try {

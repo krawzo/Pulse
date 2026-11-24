@@ -6,15 +6,17 @@ A proposta é manter a experiência de ouvir música simples sem depender de um 
 
 ## Baixar
 
-A versão oficial para **Windows é 0.3.59 (build 78)**. Para **Android, a versão oficial continua 0.3.57 (build 76)**. Os arquivos prontos para instalar estão na pasta [executaveis](executaveis/):
+A versão oficial para **Windows é 0.3.63 (build 82)**. Para **Android, a versão oficial continua 0.3.57 (build 76)**. Os arquivos prontos para instalar estão na pasta [executaveis](executaveis/):
 
 - [APK oficial para Android 0.3.57](executaveis/Pulse-Mobile-Oficial-v0.3.57-build76.apk)
-- [Instalador oficial para Windows 0.3.59](executaveis/Pulse-Desktop-Instalador-Oficial-v0.3.59-build78.exe)
-- [Windows portátil oficial 0.3.59](executaveis/Pulse-Desktop-Portatil-Oficial-v0.3.59-build78.zip)
+- [Instalador oficial para Windows 0.3.63](executaveis/Pulse-Desktop-Instalador-Oficial-v0.3.63-build82.exe)
+- [Windows portátil oficial 0.3.63](executaveis/Pulse-Desktop-Portatil-Oficial-v0.3.63-build82.zip)
 
-Eles também estão disponíveis na [release oficial v0.3.59-build78](https://github.com/krawzo/Pulse/releases/tag/v0.3.59-build78). No Android, abra o APK no celular. No Windows, execute o instalador EXE ou extraia o ZIP portátil e abra `pulse_flutter.exe`.
+Eles também estão disponíveis na [release oficial v0.3.63-build82](https://github.com/krawzo/Pulse/releases/tag/v0.3.63-build82). No Android, abra o APK no celular. No Windows, execute o instalador EXE ou extraia o ZIP portátil e abra `pulse_flutter.exe`.
 
 No Windows, a prévia na barra de tarefas oferece controles de favorito, faixa anterior, reproduzir/pausar e próxima faixa. Em Biblioteca > Tudo, músicas curtidas e playlists aparecem primeiro; o botão de ocultar a biblioteca foi removido. O cabeçalho da playlist acompanha a rolagem e dá lugar a uma barra compacta com capa, nome e reprodução.
+
+As playlists conectadas mostram a capa fornecida pelo servidor, e Músicas curtidas tem uma capa própria. O Windows mantém uma sessão do Pulse por vez: abrir novamente traz a janela existente para frente. Ao atualizar pelo instalador, as instâncias abertas são encerradas antes da substituição dos arquivos e a nova versão abre ao final.
 
 ## Código e documentação
 

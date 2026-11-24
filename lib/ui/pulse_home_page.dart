@@ -1463,6 +1463,9 @@ class _PulseHomePageState extends State<PulseHomePage>
                                                                   .jellyfin
                                                                   .serverKind
                                                                   .name,
+                                                          remotePlaylistCoverUrl:
+                                                              widget.jellyfin
+                                                                  .playlistCoverUrl,
                                                           tracks:
                                                               _availablePlaylistTracks,
                                                           compact: widget
@@ -1476,6 +1479,9 @@ class _PulseHomePageState extends State<PulseHomePage>
                                                             ...widget.jellyfin
                                                                 .favoriteIds,
                                                           },
+                                                          accountName: widget
+                                                              .jellyfin
+                                                              .username,
                                                           selectedPlaylistId:
                                                               _selectedPlaylistId,
                                                           selectedRemotePlaylistId:
@@ -5357,6 +5363,14 @@ class _PulseHomePageState extends State<PulseHomePage>
             type: 'Playlist',
             metadata: '${widget.jellyfin.serverName} • ${tracks.length} faixas',
             tracks: tracks,
+            artworkBuilder: (size) => PulseTrackArtwork(
+              artworkUrl: widget.jellyfin.playlistCoverUrl(remotePlaylist),
+              artworkTracks: tracks,
+              title: remotePlaylist['Name']?.toString() ?? 'Playlist',
+              creator: widget.jellyfin.serverName,
+              size: size,
+              borderRadius: 4,
+            ),
             onBack: () => _selectDestination(PulseDestination.playlists),
             onPlay: tracks.isEmpty
                 ? null

@@ -109,6 +109,16 @@ class JellyfinController extends ChangeNotifier {
   DateTime? get catalogUpdatedAt => _catalogUpdatedAt;
   List<Map<String, dynamic>> get artists => List.unmodifiable(_artists);
   List<Map<String, dynamic>> get playlists => List.unmodifiable(_playlists);
+  String? playlistCoverUrl(Map<String, dynamic> playlist) {
+    if (_proxy == null) return null;
+    final imageId = _serverKind == MusicServerKind.navidrome
+        ? playlist['CoverArt']?.toString()
+        : (playlist['ImageTags'] as Map?)?['Primary'] == null
+            ? null
+            : playlist['Id']?.toString();
+    return imageId == null || imageId.isEmpty ? null : _proxiedArtwork(imageId);
+  }
+
   Set<String> get favoriteIds => Set.unmodifiable(_favoriteIds);
   bool isDownloaded(AudioTrack track) =>
       track.source == AudioSource.jellyfin && _offline.contains(track.path);
@@ -149,7 +159,8 @@ class JellyfinController extends ChangeNotifier {
     }
     final signature = '$trackId|${queueIds.join(',')}';
     final now = DateTime.now();
-    if (!force && signature == _lastNavidromeQueueSignature &&
+    if (!force &&
+        signature == _lastNavidromeQueueSignature &&
         _lastNavidromeQueueSave != null &&
         now.difference(_lastNavidromeQueueSave!) <
             const Duration(seconds: 30)) {
@@ -1012,8 +1023,16 @@ class JellyfinController extends ChangeNotifier {
             parts[1] == 'audio' &&
                 _tracks.any((track) => track.path == parts.last) ||
             parts[1] == 'image' &&
-                _tracks.any((track) =>
-                    track.artworkUrl?.endsWith('/${parts.last}') == true))) {
+                (_tracks.any((track) =>
+                        track.artworkUrl?.endsWith('/${parts.last}') == true) ||
+                    _playlists.any((playlist) =>
+                        (_serverKind == MusicServerKind.navidrome
+                            ? playlist['CoverArt']?.toString()
+                            : (playlist['ImageTags'] as Map?)?['Primary'] ==
+                                    null
+                                ? null
+                                : playlist['Id']?.toString()) ==
+                        parts.last)))) {
       incoming.response.statusCode = HttpStatus.notFound;
       await incoming.response.close();
       return;
