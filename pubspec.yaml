@@ -1,7 +1,7 @@
 name: pulse_flutter
 description: Pulse desktop music player with local library and optional Jellyfin.
 publish_to: 'none'
-version: 0.3.63+82
+version: 0.3.64+83
 
 environment:
   sdk: '>=3.6.0 <4.0.0'

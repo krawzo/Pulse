@@ -2687,6 +2687,7 @@ class _PulseHomePageState extends State<PulseHomePage>
         onMarkNewSeen: () => widget.jellyfin.markNewTracksSeen(),
         playlists: widget.library.snapshot.playlists,
         remotePlaylists: widget.jellyfin.playlists,
+        remotePlaylistCoverUrl: widget.jellyfin.playlistCoverUrl,
         remotePlaylistPrefix: widget.jellyfin.serverKind.name,
         favoriteIds: {
           ...widget.library.snapshot.favoriteIds,
@@ -5327,6 +5328,7 @@ class _PulseHomePageState extends State<PulseHomePage>
               owner: widget.jellyfin.username ?? widget.jellyfin.serverName,
               durationLabel: duration,
               tracks: tracks,
+              artworkUrl: widget.jellyfin.playlistCoverUrl(remotePlaylist),
               searchController: _playlistSearchController,
               onSearchChanged: (value) =>
                   setState(() => _playlistQuery = value),

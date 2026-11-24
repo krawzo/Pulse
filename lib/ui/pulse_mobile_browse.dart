@@ -20,6 +20,7 @@ class PulseMobileBrowse extends StatefulWidget {
     required this.onMarkNewSeen,
     required this.playlists,
     required this.remotePlaylists,
+    required this.remotePlaylistCoverUrl,
     this.remotePlaylistPrefix = 'jellyfin',
     required this.favoriteIds,
     required this.currentTrackId,
@@ -52,6 +53,7 @@ class PulseMobileBrowse extends StatefulWidget {
   final VoidCallback onMarkNewSeen;
   final List<PulsePlaylist> playlists;
   final List<Map<String, dynamic>> remotePlaylists;
+  final String? Function(Map<String, dynamic>) remotePlaylistCoverUrl;
   final String remotePlaylistPrefix;
   final Set<String> favoriteIds;
   final String? currentTrackId;
@@ -78,6 +80,35 @@ class PulseMobileBrowse extends StatefulWidget {
 
   @override
   State<PulseMobileBrowse> createState() => _PulseMobileBrowseState();
+}
+
+class _LikedSongsArtwork extends StatelessWidget {
+  const _LikedSongsArtwork({required this.size, required this.radius});
+
+  final double size;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        image: true,
+        label: 'Capa de Músicas curtidas',
+        child: ExcludeSemantics(
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              gradient: const LinearGradient(
+                begin: Alignment.bottomLeft,
+                end: Alignment.topRight,
+                colors: [Color(0xFF4C32DD), Color(0xFFA3B5FF)],
+              ),
+            ),
+            child: Icon(Icons.favorite_rounded,
+                size: size * .47, color: Colors.white),
+          ),
+        ),
+      );
 }
 
 class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
@@ -227,6 +258,8 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
     final shortcuts = <({
       String title,
       AudioTrack? art,
+      String? coverUrl,
+      bool liked,
       IconData icon,
       VoidCallback tap,
       VoidCallback? more
@@ -234,6 +267,8 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
       (
         title: 'Músicas curtidas',
         art: favoriteTracks.firstOrNull,
+        coverUrl: null,
+        liked: true,
         icon: Icons.favorite_rounded,
         tap: widget.onOpenFavorites,
         more: null,
@@ -242,6 +277,8 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
         (
           title: playlist.name,
           art: _firstPlaylistTrack(playlist),
+          coverUrl: null,
+          liked: false,
           icon: Icons.queue_music_rounded,
           tap: () => widget.onOpenPlaylist(playlist.id),
           more: () => widget.onPlaylistMore(playlist.id),
@@ -251,6 +288,8 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
           (
             title: playlist['Name']?.toString() ?? 'Playlist',
             art: null,
+            coverUrl: widget.remotePlaylistCoverUrl(playlist),
+            liked: false,
             icon: Icons.queue_music_rounded,
             tap: () => widget.onOpenRemotePlaylist(id),
             more: null,
@@ -294,18 +333,27 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
                           child: SizedBox(
                             height: 56,
                             child: Row(children: [
-                              shortcut.art == null
-                                  ? Container(
-                                      width: 56,
-                                      height: 56,
-                                      color: const Color(0xFF384873),
-                                      child: Icon(shortcut.icon,
-                                          color: Colors.white))
-                                  : PulseTrackArtwork(
-                                      track: shortcut.art,
-                                      title: shortcut.title,
-                                      size: 56,
-                                      borderRadius: 0),
+                              shortcut.liked
+                                  ? const _LikedSongsArtwork(
+                                      size: 56, radius: 0)
+                                  : shortcut.coverUrl != null
+                                      ? PulseTrackArtwork(
+                                          artworkUrl: shortcut.coverUrl,
+                                          title: shortcut.title,
+                                          size: 56,
+                                          borderRadius: 0)
+                                      : shortcut.art == null
+                                          ? Container(
+                                              width: 56,
+                                              height: 56,
+                                              color: const Color(0xFF384873),
+                                              child: Icon(shortcut.icon,
+                                                  color: Colors.white))
+                                          : PulseTrackArtwork(
+                                              track: shortcut.art,
+                                              title: shortcut.title,
+                                              size: 56,
+                                              borderRadius: 0),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(shortcut.title,
@@ -562,6 +610,7 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
                   null,
                   () => widget.onOpenRemotePlaylist(id),
                   fallback: Icons.queue_music_rounded,
+                  artworkUrl: widget.remotePlaylistCoverUrl(playlist),
                 ),
           ],
           if (artists.isNotEmpty) ...[
@@ -674,11 +723,13 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
         if (_filter == _LibraryFilter.all) ...[
           _collectionTile(
               'Músicas curtidas',
-              'Playlist • ${widget.favoriteIds.length} músicas',
+              widget.accountName?.trim().isNotEmpty == true
+                  ? widget.accountName!.trim()
+                  : 'Sua playlist',
               null,
               widget.onOpenFavorites,
               fallback: Icons.favorite_rounded,
-              fallbackColor: const Color(0xFF5445A6)),
+              likedSongs: true),
         ],
         if (_filter == _LibraryFilter.all ||
             _filter == _LibraryFilter.playlists)
@@ -717,6 +768,7 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
                 onLongPress: () =>
                     widget.onPlaylistMore('${widget.remotePlaylistPrefix}:$id'),
                 fallback: Icons.queue_music_rounded,
+                artworkUrl: widget.remotePlaylistCoverUrl(playlist),
               ),
         if (_filter == _LibraryFilter.albums)
           for (final album in albums)
@@ -793,31 +845,55 @@ class _PulseMobileBrowseState extends State<PulseMobileBrowse> {
       String title, String subtitle, AudioTrack? art, VoidCallback onTap,
       {IconData fallback = Icons.album_rounded,
       Color fallbackColor = const Color(0xFF333333),
+      String? artworkUrl,
+      bool likedSongs = false,
       bool round = false,
       VoidCallback? onLongPress}) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 3),
       onTap: onTap,
       onLongPress: onLongPress,
-      leading: art == null
-          ? Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                  color: fallbackColor,
-                  borderRadius: BorderRadius.circular(round ? 27 : 5)),
-              child: Icon(fallback, color: Colors.white))
-          : PulseTrackArtwork(
-              track: art, title: title, size: 54, borderRadius: round ? 27 : 5),
+      leading: likedSongs
+          ? const _LikedSongsArtwork(size: 54, radius: 5)
+          : artworkUrl != null
+              ? PulseTrackArtwork(
+                  artworkUrl: artworkUrl,
+                  title: title,
+                  size: 54,
+                  borderRadius: round ? 27 : 5)
+              : art == null
+                  ? Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                          color: fallbackColor,
+                          borderRadius: BorderRadius.circular(round ? 27 : 5)),
+                      child: Icon(fallback, color: Colors.white))
+                  : PulseTrackArtwork(
+                      track: art,
+                      title: title,
+                      size: 54,
+                      borderRadius: round ? 27 : 5),
       title: Text(title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.white60)),
+          style: TextStyle(
+              color: likedSongs ? Color(0xFF1ED760) : Colors.white,
+              fontWeight: FontWeight.w600)),
+      subtitle: Row(children: [
+        if (likedSongs)
+          const Padding(
+            padding: EdgeInsets.only(right: 3),
+            child: Icon(Icons.push_pin_rounded,
+                size: 13, color: Color(0xFF1ED760)),
+          ),
+        Expanded(
+          child: Text(subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white60)),
+        ),
+      ]),
     );
   }
 

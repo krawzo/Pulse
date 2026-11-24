@@ -17,6 +17,7 @@ class PulseMobilePlaylistPage extends StatefulWidget {
     required this.owner,
     required this.durationLabel,
     required this.tracks,
+    this.artworkUrl,
     required this.content,
     required this.searchController,
     required this.onSearchChanged,
@@ -36,6 +37,7 @@ class PulseMobilePlaylistPage extends StatefulWidget {
   final String owner;
   final String durationLabel;
   final List<AudioTrack> tracks;
+  final String? artworkUrl;
   final Widget content;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
@@ -148,6 +150,16 @@ class _PulseMobilePlaylistPageState extends State<PulseMobilePlaylistPage> {
       );
 
   Widget _mosaic(double size) {
+    if (widget.artworkUrl case final coverUrl?) {
+      return PulseTrackArtwork(
+        artworkUrl: coverUrl,
+        artworkTracks: widget.tracks,
+        title: widget.title,
+        creator: widget.owner,
+        size: size,
+        borderRadius: 5,
+      );
+    }
     final unique = <AudioTrack>[];
     final seen = <String>{};
     for (final track in widget.tracks) {
